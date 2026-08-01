@@ -18,7 +18,10 @@ import {
   ChevronDown,
   Plus,
   SlidersHorizontal,
-  Image as ImageIcon
+  Image as ImageIcon,
+  RotateCw,
+  RotateCcw,
+  RefreshCw
 } from 'lucide-react';
 import { CADProject, CADLayer } from '../types/cad';
 import { SAMPLE_TEMPLATES } from '../data/catalog';
@@ -38,6 +41,7 @@ interface NavbarProps {
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  onRotatePlan?: (direction: 'cw' | 'ccw' | 'flip') => void;
   onOpenStepGuide: () => void;
   onOpenAuditModal: () => void;
   onOpenAIModal?: () => void;
@@ -59,6 +63,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onRedo,
   canUndo,
   canRedo,
+  onRotatePlan,
   onOpenStepGuide,
   onOpenAuditModal,
   onOpenAIModal,
@@ -124,8 +129,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header ref={navRef} className="h-14 bg-slate-900 text-slate-100 border-b border-slate-800 px-3 md:px-5 flex items-center justify-between select-none shadow-md z-30 relative">
-      {/* Undo/Redo */}
-      <div className="flex items-center space-x-3">
+      {/* Undo/Redo & Rotate Plan */}
+      <div className="flex items-center space-x-2">
         {/* Quick Undo / Redo */}
         <div className="flex items-center bg-slate-800/90 rounded-lg p-1 border border-slate-700/80 shadow-sm">
           <button
@@ -153,6 +158,27 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Redo2 className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Quick Rotate Plan Buttons */}
+        {onRotatePlan && (
+          <div className="flex items-center bg-slate-800/90 rounded-lg p-1 border border-slate-700/80 shadow-sm">
+            <button
+              onClick={() => onRotatePlan('cw')}
+              title="Girar Plano 90° Horario (Tecla: R)"
+              className="p-1.5 rounded-md text-slate-200 hover:bg-slate-700 hover:text-indigo-400 active:scale-95 transition-all flex items-center gap-1"
+            >
+              <RotateCw className="w-4 h-4 text-indigo-400" />
+              <span className="hidden lg:inline text-xs font-semibold pr-0.5">Girar 90°</span>
+            </button>
+            <button
+              onClick={() => onRotatePlan('ccw')}
+              title="Girar Plano 90° Antihorario"
+              className="p-1.5 rounded-md text-slate-200 hover:bg-slate-700 hover:text-indigo-400 active:scale-95 transition-all"
+            >
+              <RotateCcw className="w-4 h-4 text-slate-300" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Center/Right Dropdowns & Actions */}
@@ -391,6 +417,50 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Orientación y Rotación del Plano completo */}
+              {onRotatePlan && (
+                <div className="px-3 py-2 space-y-1.5 bg-slate-900/40">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    Girar Orientación del Plano
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      onClick={() => {
+                        onRotatePlan('cw');
+                        setActiveMenu(null);
+                      }}
+                      className="px-2 py-1.5 bg-slate-900 hover:bg-indigo-600/30 text-indigo-300 font-semibold rounded-lg border border-slate-700 hover:border-indigo-500/50 flex items-center justify-center gap-1 transition-colors text-[11px]"
+                      title="Girar plano 90 grados a la derecha"
+                    >
+                      <RotateCw className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>+90°</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onRotatePlan('ccw');
+                        setActiveMenu(null);
+                      }}
+                      className="px-2 py-1.5 bg-slate-900 hover:bg-indigo-600/30 text-indigo-300 font-semibold rounded-lg border border-slate-700 hover:border-indigo-500/50 flex items-center justify-center gap-1 transition-colors text-[11px]"
+                      title="Girar plano 90 grados a la izquierda"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>-90°</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onRotatePlan('flip');
+                        setActiveMenu(null);
+                      }}
+                      className="px-2 py-1.5 bg-slate-900 hover:bg-indigo-600/30 text-indigo-300 font-semibold rounded-lg border border-slate-700 hover:border-indigo-500/50 flex items-center justify-center gap-1 transition-colors text-[11px]"
+                      title="Voltear plano 180 grados"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>180°</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
             </div>
           )}

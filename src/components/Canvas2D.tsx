@@ -25,7 +25,7 @@ import {
   getOpeningPosition 
 } from '../utils/geometry';
 import { FURNITURE_CATALOG } from '../data/catalog';
-import { ZoomIn, ZoomOut, Maximize, Compass, Ruler, Magnet } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, Compass, Ruler, Magnet, RotateCw, RotateCcw } from 'lucide-react';
 
 interface Canvas2DProps {
   project: CADProject;
@@ -59,6 +59,10 @@ interface Canvas2DProps {
   selectedPlumbingType: PlumbingFixtureType;
   selectedElectricalType: ElectricalItemType;
   onToggleMeasureLine?: () => void;
+  onRotatePlan?: (direction: 'cw' | 'ccw' | 'flip') => void;
+  activeWallThickness?: number;
+  activeDoorWidth?: number;
+  activeWindowWidth?: number;
 }
 
 export const Canvas2D: React.FC<Canvas2DProps> = ({
@@ -88,6 +92,10 @@ export const Canvas2D: React.FC<Canvas2DProps> = ({
   selectedPlumbingType,
   selectedElectricalType,
   onToggleMeasureLine,
+  onRotatePlan,
+  activeWallThickness = 0.15,
+  activeDoorWidth = 0.85,
+  activeWindowWidth = 1.40,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -364,8 +372,8 @@ export const Canvas2D: React.FC<Canvas2DProps> = ({
             id: `wall-${Date.now()}`,
             start: drawStartPt,
             end: worldPt,
-            thickness: 0.15,
-            type: 'interior',
+            thickness: activeWallThickness,
+            type: activeWallThickness >= 0.20 ? 'exterior' : 'interior',
           });
         }
         if (project.showMeasureLine === false) {
@@ -386,7 +394,7 @@ export const Canvas2D: React.FC<Canvas2DProps> = ({
           id: `door-${Date.now()}`,
           wallId: w.id,
           offset: offsetDist,
-          width: 0.85,
+          width: activeDoorWidth,
           type: 'door',
           swing: 'in',
         });
@@ -403,8 +411,24 @@ export const Canvas2D: React.FC<Canvas2DProps> = ({
           id: `win-${Date.now()}`,
           wallId: w.id,
           offset: offsetDist,
-          width: 1.40,
+          width: activeWindowWidth,
           type: 'window',
+        });
+      }
+      return;
+    }
+
+    // Arch Opening Tool
+    if (activeTool === 'arch_opening') {
+      const w = findWallAt(worldPt);
+      if (w) {
+        const offsetDist = distance(w.start, worldPt);
+        onAddOpening({
+          id: `arch-${Date.now()}`,
+          wallId: w.id,
+          offset: offsetDist,
+          width: 1.20,
+          type: 'arch',
         });
       }
       return;
@@ -896,18 +920,73 @@ export const Canvas2D: React.FC<Canvas2DProps> = ({
         ctx.lineWidth = isSelected ? 2 : 1;
         ctx.stroke();
 
-        // Wall Dimension Label (if showDimensions is enabled)
-        if (project.showDimensions) {
-          const midX = (wall.start.x + wall.end.x) / 2;
-          const midY = (wall.start.y + wall.end.y) / 2;
-          const len = distance(wall.start, wall.end);
-          const sc = worldToScreen(midX, midY);
+        // Wall Dimension Label & Selected Wall Handles
+        const midX = (wall.start.x + wall.end.x) / 2;
+        const midY = (wall.start.y + wall.end.y) / 2;
+        const len = distance(wall.start, wall.end);
 
+        if (project.showDimensions && !isSelected) {
+          const sc = worldToScreen(midX, midY);
           ctx.fillStyle = '#38BDF8';
           ctx.font = 'bold 11px sans-serif';
           ctx.textAlign = 'center';
           ctx.fillText(formatMeters(len), sc.x, sc.y - 6);
           ctx.textAlign = 'left';
+        }
+
+        // Draw Interactive Drag Handle Nodes for Selected Wall
+        if (isSelected) {
+          const scStart = worldToScreen(wall.start.x, wall.start.y);
+          const scEnd = worldToScreen(wall.end.x, wall.end.y);
+          const scMid = worldToScreen(midX, midY);
+
+          // Start Node (Green Handle)
+          ctx.beginPath();
+          ctx.arc(scStart.x, scStart.y, 7, 0, Math.PI * 2);
+          ctx.fillStyle = '#10B981';
+          ctx.fill();
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // End Node (Blue Handle)
+          ctx.beginPath();
+          ctx.arc(scEnd.x, scEnd.y, 7, 0, Math.PI * 2);
+          ctx.fillStyle = '#3B82F6';
+          ctx.fill();
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // Center Node (Indigo Handle)
+          ctx.beginPath();
+          ctx.arc(scMid.x, scMid.y, 5, 0, Math.PI * 2);
+          ctx.fillStyle = '#818CF8';
+          ctx.fill();
+          ctx.strokeStyle = '#0F172A';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          // Dimension HUD Badge on Selected Wall
+          const thickCm = Math.round(wall.thickness * 100);
+          const badgeText = `${formatMeters(len)} • ${thickCm}cm`;
+          
+          ctx.save();
+          ctx.font = 'bold 11px monospace';
+          const bw = ctx.measureText(badgeText).width + 16;
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+          ctx.strokeStyle = '#818CF8';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.roundRect(scMid.x - bw / 2, scMid.y - 28, bw, 20, 5);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#E0E7FF';
+          ctx.textAlign = 'center';
+          ctx.fillText(badgeText, scMid.x, scMid.y - 14);
+          ctx.textAlign = 'left';
+          ctx.restore();
         }
       });
 
@@ -1474,6 +1553,25 @@ export const Canvas2D: React.FC<Canvas2DProps> = ({
         >
           <Maximize className="w-4 h-4" />
         </button>
+
+        {onRotatePlan && (
+          <div className="flex items-center border-l border-slate-800 pl-1 ml-1 space-x-0.5">
+            <button
+              onClick={() => onRotatePlan('cw')}
+              className="p-1.5 rounded-lg text-indigo-400 hover:bg-slate-800 hover:text-indigo-300 transition-colors"
+              title="Girar Plano 90° Horario (para trabajar más cómodo - Tecla: R)"
+            >
+              <RotateCw className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => onRotatePlan('ccw')}
+              className="p-1.5 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+              title="Girar Plano 90° Antihorario"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Live mouse cursor metric display coordinates overlay */}

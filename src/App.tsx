@@ -113,6 +113,11 @@ export default function App() {
   const [selectedPlumbingType, setSelectedPlumbingType] = useState<PlumbingFixtureType>('toilet');
   const [selectedElectricalType, setSelectedElectricalType] = useState<ElectricalItemType>('outlet_110v');
 
+  // Architectural active configuration
+  const [activeWallThickness, setActiveWallThickness] = useState<number>(0.15);
+  const [activeDoorWidth, setActiveDoorWidth] = useState<number>(0.85);
+  const [activeWindowWidth, setActiveWindowWidth] = useState<number>(1.40);
+
   // Modal states
   const [isStepGuideOpen, setIsStepGuideOpen] = useState(false);
   const [activeStepNumber, setActiveStepNumber] = useState(1);
@@ -215,6 +220,90 @@ export default function App() {
     updateProjectWithHistory(next);
     setSelectedId(room.id);
     setSelectedType('room');
+    setActiveTool('select');
+  };
+
+  const handleQuickAddRoomTag = (tagName: string) => {
+    let px = 3, py = 3;
+    if (project.rooms.length > 0) {
+      const last = project.rooms[project.rooms.length - 1];
+      px = Math.round((last.position.x + 2.5) * 10) / 10;
+      py = last.position.y;
+    } else if (project.walls.length > 0) {
+      px = Math.round(((project.walls[0].start.x + project.walls[0].end.x) / 2) * 10) / 10;
+      py = Math.round(((project.walls[0].start.y + project.walls[0].end.y) / 2) * 10) / 10;
+    }
+    const newRoom: RoomLabel = {
+      id: `room-${Date.now()}`,
+      position: { x: px, y: py },
+      name: tagName,
+      areaM2: 12.0,
+    };
+    handleAddRoomLabel(newRoom);
+  };
+
+  const handleQuickInsertPrefabRoom = (roomType: 'bedroom' | 'bathroom' | 'kitchen' | 'living' | 'office' | 'studio') => {
+    let maxX = 0, minY = 1;
+    if (project.walls.length > 0) {
+      maxX = Math.max(...project.walls.map(w => Math.max(w.start.x, w.end.x)));
+      minY = Math.min(...project.walls.map(w => Math.min(w.start.y, w.end.y)));
+    }
+
+    const startX = project.walls.length > 0 ? Math.round((maxX + 1.5) * 10) / 10 : 1;
+    const startY = project.walls.length > 0 ? Math.round(minY * 10) / 10 : 1;
+
+    const now = Date.now();
+    let width = 4, depth = 3;
+    let roomName = 'Dormitorio Principal';
+    let thick = 0.15;
+
+    if (roomType === 'bathroom') { width = 2.5; depth = 1.8; roomName = 'Baño Completo'; }
+    else if (roomType === 'kitchen') { width = 4.0; depth = 3.5; roomName = 'Cocina Abierta'; }
+    else if (roomType === 'living') { width = 5.0; depth = 4.0; roomName = 'Sala de Estar'; thick = 0.20; }
+    else if (roomType === 'office') { width = 3.5; depth = 3.0; roomName = 'Oficina / Estudio'; }
+    else if (roomType === 'studio') { width = 6.0; depth = 4.5; roomName = 'Monoambiente Studio'; thick = 0.20; }
+
+    const endX = Math.round((startX + width) * 10) / 10;
+    const endY = Math.round((startY + depth) * 10) / 10;
+
+    const wN: Wall = { id: `wall-${now}-1`, start: { x: startX, y: startY }, end: { x: endX, y: startY }, thickness: thick, type: thick >= 0.20 ? 'exterior' : 'interior', label: 'Muro Norte' };
+    const wE: Wall = { id: `wall-${now}-2`, start: { x: endX, y: startY }, end: { x: endX, y: endY }, thickness: thick, type: thick >= 0.20 ? 'exterior' : 'interior', label: 'Muro Este' };
+    const wS: Wall = { id: `wall-${now}-3`, start: { x: endX, y: endY }, end: { x: startX, y: endY }, thickness: thick, type: thick >= 0.20 ? 'exterior' : 'interior', label: 'Muro Sur' };
+    const wW: Wall = { id: `wall-${now}-4`, start: { x: startX, y: endY }, end: { x: startX, y: startY }, thickness: thick, type: thick >= 0.20 ? 'exterior' : 'interior', label: 'Muro Oeste' };
+
+    const doorOp: WallOpening = {
+      id: `door-${now}`,
+      wallId: wS.id,
+      offset: 0.8,
+      width: roomType === 'bathroom' ? 0.80 : 0.90,
+      type: 'door',
+      swing: 'in',
+    };
+
+    const winOp: WallOpening = {
+      id: `win-${now}`,
+      wallId: wN.id,
+      offset: width / 2,
+      width: roomType === 'bathroom' ? 0.60 : 1.40,
+      type: 'window',
+    };
+
+    const newRoomLabel: RoomLabel = {
+      id: `room-${now}`,
+      position: { x: Math.round((startX + width / 2) * 10) / 10, y: Math.round((startY + depth / 2) * 10) / 10 },
+      name: roomName,
+      areaM2: Math.round(width * depth * 10) / 10,
+    };
+
+    const nextProject: CADProject = {
+      ...project,
+      walls: [...project.walls, wN, wE, wS, wW],
+      openings: [...project.openings, doorOp, winOp],
+      rooms: [...project.rooms, newRoomLabel],
+    };
+
+    updateProjectWithHistory(nextProject);
+    setActiveLayer('arch');
     setActiveTool('select');
   };
 
@@ -326,6 +415,89 @@ export default function App() {
     link.click();
   };
 
+  // Rotate entire plan geometry by 90° CW, 90° CCW, or 180°
+  const handleRotatePlan = useCallback(
+    (direction: 'cw' | 'ccw' | 'flip') => {
+      const angleDeg = direction === 'cw' ? 90 : direction === 'ccw' ? -90 : 180;
+
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      const includePt = (pt: { x: number; y: number } | undefined) => {
+        if (!pt) return;
+        minX = Math.min(minX, pt.x);
+        maxX = Math.max(maxX, pt.x);
+        minY = Math.min(minY, pt.y);
+        maxY = Math.max(maxY, pt.y);
+      };
+
+      project.walls.forEach((w) => { includePt(w.start); includePt(w.end); });
+      project.furniture.forEach((f) => includePt(f.position));
+      project.plumbingFixtures.forEach((p) => includePt(p.position));
+      project.electricalItems.forEach((e) => includePt(e.position));
+      project.pipes.forEach((p) => { includePt(p.start); includePt(p.end); });
+      project.rooms.forEach((r) => includePt(r.position));
+
+      if (minX === Infinity) {
+        minX = -5; maxX = 5; minY = -5; maxY = 5;
+      }
+
+      const cx = Math.round(((minX + maxX) / 2) * 20) / 20;
+      const cy = Math.round(((minY + maxY) / 2) * 20) / 20;
+
+      const rad = (angleDeg * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+
+      const rotatePt = (pt: { x: number; y: number }) => {
+        const dx = pt.x - cx;
+        const dy = pt.y - cy;
+        return {
+          x: Math.round((cx + (dx * cos - dy * sin)) * 100) / 100,
+          y: Math.round((cy + (dx * sin + dy * cos)) * 100) / 100,
+        };
+      };
+
+      const newProject: CADProject = {
+        ...project,
+        walls: project.walls.map((w) => ({
+          ...w,
+          start: rotatePt(w.start),
+          end: rotatePt(w.end),
+        })),
+        furniture: project.furniture.map((f) => ({
+          ...f,
+          position: rotatePt(f.position),
+          rotation: (f.rotation + angleDeg + 360) % 360,
+        })),
+        plumbingFixtures: project.plumbingFixtures.map((p) => ({
+          ...p,
+          position: rotatePt(p.position),
+          rotation: (p.rotation + angleDeg + 360) % 360,
+        })),
+        electricalItems: project.electricalItems.map((e) => ({
+          ...e,
+          position: rotatePt(e.position),
+          rotation: (e.rotation + angleDeg + 360) % 360,
+        })),
+        pipes: project.pipes.map((p) => ({
+          ...p,
+          start: rotatePt(p.start),
+          end: rotatePt(p.end),
+        })),
+        rooms: project.rooms.map((r) => ({
+          ...r,
+          position: rotatePt(r.position),
+        })),
+        electricalWires: project.electricalWires.map((w) => ({
+          ...w,
+          path: w.path ? w.path.map(rotatePt) : undefined,
+        })),
+      };
+
+      updateProjectWithHistory(newProject);
+    },
+    [project, updateProjectWithHistory]
+  );
+
   // Global Keyboard Shortcuts for architect design speed
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -402,34 +574,39 @@ export default function App() {
         }
       }
 
-      // Rotate selected item (furniture, plumbing, electrical) by 15 deg (or -15 with shift)
-      if (e.key.toLowerCase() === 'r' && selectedId) {
+      // Rotate selected item by 15 deg, OR rotate entire plan by 90 deg if nothing selected
+      if (e.key.toLowerCase() === 'r') {
         e.preventDefault();
-        const delta = e.shiftKey ? -15 : 15;
-        if (selectedType === 'furniture') {
-          const f = project.furniture.find((item) => item.id === selectedId);
-          if (f) {
-            handleUpdateFurniture({
-              ...f,
-              rotation: ((f.rotation + delta) % 360 + 360) % 360,
-            });
+        if (selectedId) {
+          const delta = e.shiftKey ? -15 : 15;
+          if (selectedType === 'furniture') {
+            const f = project.furniture.find((item) => item.id === selectedId);
+            if (f) {
+              handleUpdateFurniture({
+                ...f,
+                rotation: ((f.rotation + delta) % 360 + 360) % 360,
+              });
+            }
+          } else if (selectedType === 'plumbing') {
+            const p = project.plumbingFixtures.find((item) => item.id === selectedId);
+            if (p) {
+              handleUpdatePlumbingFixture({
+                ...p,
+                rotation: ((p.rotation + delta) % 360 + 360) % 360,
+              });
+            }
+          } else if (selectedType === 'electrical') {
+            const el = project.electricalItems.find((item) => item.id === selectedId);
+            if (el) {
+              handleUpdateElectricalItem({
+                ...el,
+                rotation: ((el.rotation + delta) % 360 + 360) % 360,
+              });
+            }
           }
-        } else if (selectedType === 'plumbing') {
-          const p = project.plumbingFixtures.find((item) => item.id === selectedId);
-          if (p) {
-            handleUpdatePlumbingFixture({
-              ...p,
-              rotation: ((p.rotation + delta) % 360 + 360) % 360,
-            });
-          }
-        } else if (selectedType === 'electrical') {
-          const el = project.electricalItems.find((item) => item.id === selectedId);
-          if (el) {
-            handleUpdateElectricalItem({
-              ...el,
-              rotation: ((el.rotation + delta) % 360 + 360) % 360,
-            });
-          }
+        } else {
+          // No item selected: Rotate entire project plan by 90 deg!
+          handleRotatePlan(e.shiftKey ? 'ccw' : 'cw');
         }
         return;
       }
@@ -519,6 +696,7 @@ export default function App() {
         onRedo={handleRedo}
         canUndo={history.length > 0}
         canRedo={future.length > 0}
+        onRotatePlan={handleRotatePlan}
         onOpenStepGuide={() => {
           setIsStepGuideOpen(true);
         }}
@@ -605,6 +783,23 @@ export default function App() {
                 : 'elec_light'
             );
           }}
+          activeWallThickness={activeWallThickness}
+          onSelectWallThickness={(thick) => {
+            setActiveWallThickness(thick);
+            setActiveTool('wall');
+          }}
+          activeDoorWidth={activeDoorWidth}
+          onSelectDoorWidth={(width) => {
+            setActiveDoorWidth(width);
+            setActiveTool('door');
+          }}
+          activeWindowWidth={activeWindowWidth}
+          onSelectWindowWidth={(width) => {
+            setActiveWindowWidth(width);
+            setActiveTool('window');
+          }}
+          onQuickAddRoomTag={handleQuickAddRoomTag}
+          onQuickInsertPrefabRoom={handleQuickInsertPrefabRoom}
         />
 
         <Canvas2D
@@ -614,6 +809,9 @@ export default function App() {
           activeTool={activeTool}
           selectedId={selectedId}
           selectedType={selectedType}
+          activeWallThickness={activeWallThickness}
+          activeDoorWidth={activeDoorWidth}
+          activeWindowWidth={activeWindowWidth}
           onSelectObject={(id, type) => {
             setSelectedId(id);
             setSelectedType(type);
@@ -636,6 +834,7 @@ export default function App() {
           selectedFurnitureId={selectedFurnitureId}
           selectedPlumbingType={selectedPlumbingType}
           selectedElectricalType={selectedElectricalType}
+          onRotatePlan={handleRotatePlan}
           onToggleMeasureLine={() => {
             if (project.showMeasureLine && activeTool === 'measure') {
               setActiveTool('select');

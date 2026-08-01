@@ -10,6 +10,7 @@ export type ToolType =
   | 'wall'
   | 'door'
   | 'window'
+  | 'arch_opening'
   | 'room_label'
   // Plumbing tools
   | 'pipe_cold'
@@ -37,6 +38,7 @@ export interface Wall {
   start: Point2D;
   end: Point2D;
   thickness: number; // in meters, default 0.15m (15 cm)
+  height?: number;   // in meters, default 2.60m
   type: 'exterior' | 'interior' | 'partition';
   label?: string;
 }
@@ -114,7 +116,7 @@ export interface ElectricalWire {
 
 export interface FurnitureItem {
   id: string;
-  category: 'bedroom' | 'living' | 'dining' | 'kitchen' | 'office' | 'storage' | 'bathroom' | 'outdoor';
+  category: 'bedroom' | 'living' | 'dining' | 'kitchen' | 'office' | 'storage' | 'bathroom' | 'outdoor' | 'structural';
   name: string;      // Display name in Spanish
   position: Point2D; // Center position in meters
   width: number;     // Width in meters (X axis before rotation)
@@ -164,7 +166,7 @@ export interface CADProject {
 
 export interface CatalogFurnitureTemplate {
   id: string;
-  category: 'bedroom' | 'living' | 'dining' | 'kitchen' | 'office' | 'storage' | 'bathroom' | 'outdoor';
+  category: 'bedroom' | 'living' | 'dining' | 'kitchen' | 'office' | 'storage' | 'bathroom' | 'outdoor' | 'structural';
   name: string;
   width: number; // meters
   depth: number; // meters

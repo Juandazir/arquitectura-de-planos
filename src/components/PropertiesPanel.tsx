@@ -9,7 +9,8 @@ import {
   Zap, 
   Droplet, 
   Armchair,
-  Check
+  Check,
+  Maximize2
 } from 'lucide-react';
 import { 
   CADProject, 
@@ -22,6 +23,493 @@ import {
   WallOpening 
 } from '../types/cad';
 import { distance, formatMeters } from '../utils/geometry';
+
+// Subcomponent: WallInspector with full controls to edit wall dimensions after placement
+const WallInspectorComponent: React.FC<{
+  wall: Wall;
+  project: CADProject;
+  onUpdateWall: (updated: Wall) => void;
+  onDeleteSelected: () => void;
+  onAddOpeningToWall: (wallId: string, type: 'door' | 'window') => void;
+  onDeleteOpening: (openingId: string) => void;
+}> = ({
+  wall,
+  project,
+  onUpdateWall,
+  onDeleteSelected,
+  onAddOpeningToWall,
+  onDeleteOpening,
+}) => {
+  const [anchorMode, setAnchorMode] = React.useState<'end' | 'start' | 'center'>('end');
+  const [customLengthInput, setCustomLengthInput] = React.useState<string>('');
+
+  const lenMeters = distance(wall.start, wall.end);
+  const wallOpenings = project.openings.filter((o) => o.wallId === wall.id);
+  const wallHeight = wall.height || 2.60;
+
+  // Compute angle
+  const dx = wall.end.x - wall.start.x;
+  const dy = wall.end.y - wall.start.y;
+  let angleDeg = Math.round((Math.atan2(dy, dx) * 180) / Math.PI);
+  if (angleDeg < 0) angleDeg += 360;
+
+  // Surface area & volume calculations
+  const surfaceAreaSqM = Math.round(lenMeters * wallHeight * 100) / 100;
+  const volumeCuM = Math.round(surfaceAreaSqM * wall.thickness * 100) / 100;
+
+  // Helper to change wall length
+  const handleSetLength = (newLen: number) => {
+    if (newLen <= 0.05) return;
+    let ux = 1, uy = 0;
+    if (lenMeters > 0.0001) {
+      ux = dx / lenMeters;
+      uy = dy / lenMeters;
+    }
+
+    let newStart = { ...wall.start };
+    let newEnd = { ...wall.end };
+
+    if (anchorMode === 'end') {
+      newEnd = {
+        x: Math.round((wall.start.x + ux * newLen) * 100) / 100,
+        y: Math.round((wall.start.y + uy * newLen) * 100) / 100,
+      };
+    } else if (anchorMode === 'start') {
+      newStart = {
+        x: Math.round((wall.end.x - ux * newLen) * 100) / 100,
+        y: Math.round((wall.end.y - uy * newLen) * 100) / 100,
+      };
+    } else {
+      const cx = (wall.start.x + wall.end.x) / 2;
+      const cy = (wall.start.y + wall.end.y) / 2;
+      const half = newLen / 2;
+      newStart = {
+        x: Math.round((cx - ux * half) * 100) / 100,
+        y: Math.round((cy - uy * half) * 100) / 100,
+      };
+      newEnd = {
+        x: Math.round((cx + ux * half) * 100) / 100,
+        y: Math.round((cy + uy * half) * 100) / 100,
+      };
+    }
+
+    onUpdateWall({
+      ...wall,
+      start: newStart,
+      end: newEnd,
+    });
+  };
+
+  // Helper to change angle
+  const handleSetAngle = (targetDeg: number) => {
+    const rad = (targetDeg * Math.PI) / 180;
+    const ux = Math.cos(rad);
+    const uy = Math.sin(rad);
+    const newEnd = {
+      x: Math.round((wall.start.x + ux * lenMeters) * 100) / 100,
+      y: Math.round((wall.start.y + uy * lenMeters) * 100) / 100,
+    };
+    onUpdateWall({
+      ...wall,
+      end: newEnd,
+    });
+  };
+
+  return (
+    <aside className="w-80 bg-slate-900 border-l border-slate-800 p-4 text-slate-200 flex flex-col justify-between select-none shadow-lg z-10 overflow-y-auto">
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-indigo-400">
+            <Sliders className="w-4 h-4" />
+            <span>Muro Arquitectónico</span>
+          </div>
+          <button
+            onClick={onDeleteSelected}
+            className="p-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition-colors flex items-center gap-1 text-xs font-semibold"
+            title="Eliminar muro"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Borrar</span>
+          </button>
+        </div>
+
+        {/* Dimension & Metrics Header Card */}
+        <div className="bg-slate-800/90 p-3 rounded-xl border border-slate-700/80 space-y-2.5 shadow-sm">
+          <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-700/60">
+            <span className="text-slate-400 font-semibold flex items-center gap-1">
+              <Ruler className="w-3.5 h-3.5 text-indigo-400" />
+              Longitud Actual:
+            </span>
+            <span className="font-extrabold text-indigo-300 text-base">{formatMeters(lenMeters)}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-[11px] pt-0.5">
+            <div className="bg-slate-900/80 p-2 rounded-lg border border-slate-700/50">
+              <span className="text-slate-400 block text-[10px]">Área de Pared:</span>
+              <span className="font-bold text-slate-200">{surfaceAreaSqM} m²</span>
+            </div>
+            <div className="bg-slate-900/80 p-2 rounded-lg border border-slate-700/50">
+              <span className="text-slate-400 block text-[10px]">Volumen Material:</span>
+              <span className="font-bold text-slate-200">{volumeCuM} m³</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 1. CAMBIAR LONGITUD EXACTA DEL MURO */}
+        <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60 space-y-2.5">
+          <label className="block text-xs font-bold text-slate-200 flex items-center gap-1.5">
+            <Maximize2 className="w-3.5 h-3.5 text-indigo-400" />
+            Cambiar Longitud del Muro:
+          </label>
+
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <input
+                type="number"
+                step={0.01}
+                min={0.1}
+                max={100}
+                placeholder={lenMeters.toFixed(2)}
+                value={customLengthInput}
+                onChange={(e) => setCustomLengthInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const val = parseFloat(customLengthInput);
+                    if (!isNaN(val) && val > 0) {
+                      handleSetLength(val);
+                      setCustomLengthInput('');
+                    }
+                  }
+                }}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-white focus:outline-none focus:border-indigo-500 pr-8"
+              />
+              <span className="absolute right-2.5 top-1.5 text-xs font-bold text-slate-400">m</span>
+            </div>
+            <button
+              onClick={() => {
+                const val = parseFloat(customLengthInput);
+                if (!isNaN(val) && val > 0) {
+                  handleSetLength(val);
+                  setCustomLengthInput('');
+                }
+              }}
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-colors"
+            >
+              Aplicar
+            </button>
+          </div>
+
+          {/* Micro-ajustes +/- */}
+          <div>
+            <div className="text-[10px] text-slate-400 font-semibold mb-1">Ajuste rápido (+ / -):</div>
+            <div className="grid grid-cols-4 gap-1">
+              {[-0.50, -0.10, +0.10, +0.50].map((delta) => (
+                <button
+                  key={delta}
+                  onClick={() => handleSetLength(Math.max(0.1, lenMeters + delta))}
+                  className="py-1 bg-slate-900/80 hover:bg-slate-700 border border-slate-700 rounded text-[10px] font-bold text-indigo-300 transition-colors"
+                >
+                  {delta > 0 ? `+${delta.toFixed(2)}m` : `${delta.toFixed(2)}m`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Presets de longitud */}
+          <div>
+            <div className="text-[10px] text-slate-400 font-semibold mb-1">Valores estándar:</div>
+            <div className="grid grid-cols-4 gap-1">
+              {[1.0, 2.0, 3.0, 4.0, 5.0, 6.0].map((preset) => (
+                <button
+                  key={preset}
+                  onClick={() => handleSetLength(preset)}
+                  className={`py-1 rounded text-[10px] font-bold border transition-colors ${
+                    Math.abs(lenMeters - preset) < 0.02
+                      ? 'bg-indigo-600 border-indigo-500 text-white'
+                      : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  {preset.toFixed(1)}m
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Ancla de Extensión */}
+          <div className="pt-1 border-t border-slate-700/50">
+            <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+              Extender / Reducir hacia:
+            </label>
+            <div className="grid grid-cols-3 gap-1">
+              <button
+                onClick={() => setAnchorMode('end')}
+                className={`py-1 px-1.5 rounded text-[10px] font-semibold border transition-all text-center ${
+                  anchorMode === 'end'
+                    ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
+                    : 'bg-slate-900 border-slate-700/80 text-slate-400 hover:text-slate-200'
+                }`}
+                title="Mantiene el punto de inicio fijo y mueve el extremo final"
+              >
+                Punto Fin
+              </button>
+              <button
+                onClick={() => setAnchorMode('start')}
+                className={`py-1 px-1.5 rounded text-[10px] font-semibold border transition-all text-center ${
+                  anchorMode === 'start'
+                    ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
+                    : 'bg-slate-900 border-slate-700/80 text-slate-400 hover:text-slate-200'
+                }`}
+                title="Mantiene el punto final fijo y mueve el extremo inicial"
+              >
+                Punto Inicio
+              </button>
+              <button
+                onClick={() => setAnchorMode('center')}
+                className={`py-1 px-1.5 rounded text-[10px] font-semibold border transition-all text-center ${
+                  anchorMode === 'center'
+                    ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
+                    : 'bg-slate-900 border-slate-700/80 text-slate-400 hover:text-slate-200'
+                }`}
+                title="Extiende o reduce simétricamente desde el centro del muro"
+              >
+                Centro
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. ESPESOR Y ALTURA DE LA PARED */}
+        <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60 space-y-2.5">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                Espesor (cm):
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step={1}
+                  min={5}
+                  max={100}
+                  value={Math.round(wall.thickness * 100)}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 15;
+                    onUpdateWall({ ...wall, thickness: val / 100 });
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-white focus:outline-none focus:border-indigo-500 pr-7"
+                />
+                <span className="absolute right-2 top-1 text-[10px] font-bold text-slate-400">cm</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                Altura (m):
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step={0.1}
+                  min={1}
+                  max={20}
+                  value={wallHeight}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 2.60;
+                    onUpdateWall({ ...wall, height: val });
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-white focus:outline-none focus:border-indigo-500 pr-6"
+                />
+                <span className="absolute right-2 top-1 text-[10px] font-bold text-slate-400">m</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick presets for thickness */}
+          <div className="flex gap-1">
+            {[
+              { label: '10cm', val: 0.10 },
+              { label: '15cm', val: 0.15 },
+              { label: '20cm', val: 0.20 },
+              { label: '30cm', val: 0.30 },
+            ].map((th) => (
+              <button
+                key={th.label}
+                onClick={() => onUpdateWall({ ...wall, thickness: th.val })}
+                className={`flex-1 py-1 rounded text-[10px] font-bold border transition-colors ${
+                  Math.abs(wall.thickness - th.val) < 0.01
+                    ? 'bg-indigo-600 border-indigo-500 text-white'
+                    : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {th.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 3. ORIENTACIÓN Y ÁNGULO DEL MURO */}
+        <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60 space-y-2">
+          <div className="flex justify-between items-center text-xs">
+            <span className="font-bold text-slate-300">Ángulo de Inclinación:</span>
+            <span className="font-mono font-bold text-indigo-300">{angleDeg}°</span>
+          </div>
+          <div className="grid grid-cols-4 gap-1">
+            {[
+              { label: '0° (H)', deg: 0 },
+              { label: '90° (V)', deg: 90 },
+              { label: '180°', deg: 180 },
+              { label: '270°', deg: 270 },
+            ].map((a) => (
+              <button
+                key={a.label}
+                onClick={() => handleSetAngle(a.deg)}
+                className={`py-1 rounded text-[10px] font-bold border transition-colors ${
+                  angleDeg === a.deg
+                    ? 'bg-indigo-600 border-indigo-500 text-white'
+                    : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 4. TIPO ESTRUCTURAL */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-300 mb-1">
+            Tipo estructural:
+          </label>
+          <select
+            value={wall.type}
+            onChange={(e) =>
+              onUpdateWall({ ...wall, type: e.target.value as Wall['type'] })
+            }
+            className="w-full bg-slate-800 text-xs font-semibold text-slate-200 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500"
+          >
+            <option value="exterior">Exterior Perimetral</option>
+            <option value="interior">Interior Carga / División</option>
+            <option value="partition">Tabiquería Liviana</option>
+          </select>
+        </div>
+
+        {/* 5. COORDENADAS EXACTAS */}
+        <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60 space-y-2">
+          <div className="text-[11px] font-bold text-slate-300">Coordenadas Exactas de Extremos (m):</div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] text-slate-400">Inicio X (m):</label>
+              <input
+                type="number"
+                step={0.01}
+                value={wall.start.x}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value) || 0;
+                  onUpdateWall({ ...wall, start: { ...wall.start, x: val } });
+                }}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-100 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-slate-400">Inicio Y (m):</label>
+              <input
+                type="number"
+                step={0.01}
+                value={wall.start.y}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value) || 0;
+                  onUpdateWall({ ...wall, start: { ...wall.start, y: val } });
+                }}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-100 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-slate-400">Fin X (m):</label>
+              <input
+                type="number"
+                step={0.01}
+                value={wall.end.x}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value) || 0;
+                  onUpdateWall({ ...wall, end: { ...wall.end, x: val } });
+                }}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-100 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-slate-400">Fin Y (m):</label>
+              <input
+                type="number"
+                step={0.01}
+                value={wall.end.y}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value) || 0;
+                  onUpdateWall({ ...wall, end: { ...wall.end, y: val } });
+                }}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-100 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 6. PUERTAS Y VENTANAS EN ESTE MURO */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-300">
+              Puertas & Ventanas en este muro:
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5 mb-3">
+            <button
+              onClick={() => onAddOpeningToWall(wall.id, 'door')}
+              className="px-2 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/30 text-xs font-semibold"
+            >
+              + Puerta (0.8m)
+            </button>
+            <button
+              onClick={() => onAddOpeningToWall(wall.id, 'window')}
+              className="px-2 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/30 text-xs font-semibold"
+            >
+              + Ventana (1.2m)
+            </button>
+          </div>
+
+          {wallOpenings.length === 0 ? (
+            <div className="text-[11px] text-slate-500 italic text-center py-2 bg-slate-800/40 rounded-lg">
+              Sin aberturas colocadas.
+            </div>
+          ) : (
+            <div className="space-y-1.5 max-h-40 overflow-y-auto">
+              {wallOpenings.map((op) => (
+                <div
+                  key={op.id}
+                  className="p-2 bg-slate-800 rounded-lg border border-slate-700/80 flex items-center justify-between text-xs"
+                >
+                  <div>
+                    <span className="font-bold capitalize text-slate-200">
+                      {op.type === 'door' ? '🚪 Puerta' : '🪟 Ventana'}
+                    </span>
+                    <span className="text-slate-400 text-[10px] block">
+                      Ancho: {formatMeters(op.width)}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => onDeleteOpening(op.id)}
+                    className="p-1 text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded"
+                    title="Eliminar abertura"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </aside>
+  );
+};
 
 const RotationControl: React.FC<{
   rotation: number;
@@ -174,190 +662,16 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   if (selectedType === 'wall') {
     const wall = project.walls.find((w) => w.id === selectedId);
     if (!wall) return null;
-    const lenMeters = distance(wall.start, wall.end);
-    const wallOpenings = project.openings.filter((o) => o.wallId === wall.id);
 
     return (
-      <aside className="w-72 bg-slate-900 border-l border-slate-800 p-4 text-slate-200 flex flex-col justify-between select-none shadow-lg z-10 overflow-y-auto">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-indigo-400">
-              <Sliders className="w-4 h-4" />
-              <span>Muro Arquitectónico</span>
-            </div>
-            <button
-              onClick={onDeleteSelected}
-              className="p-1 rounded bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition-colors"
-              title="Eliminar muro"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 space-y-2.5">
-            <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-700/50">
-              <span className="text-slate-400 font-semibold">Longitud del muro:</span>
-              <span className="font-bold text-indigo-300 text-sm">{formatMeters(lenMeters)}</span>
-            </div>
-
-            <div className="text-[11px] font-bold text-slate-300">Coordenadas Exactas (m):</div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[10px] text-slate-400">Inicio X (m):</label>
-                <input
-                  type="number"
-                  step={0.01}
-                  value={wall.start.x}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value) || 0;
-                    onUpdateWall({ ...wall, start: { ...wall.start, x: val } });
-                  }}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-100 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] text-slate-400">Inicio Y (m):</label>
-                <input
-                  type="number"
-                  step={0.01}
-                  value={wall.start.y}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value) || 0;
-                    onUpdateWall({ ...wall, start: { ...wall.start, y: val } });
-                  }}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-100 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] text-slate-400">Fin X (m):</label>
-                <input
-                  type="number"
-                  step={0.01}
-                  value={wall.end.x}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value) || 0;
-                    onUpdateWall({ ...wall, end: { ...wall.end, x: val } });
-                  }}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-100 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] text-slate-400">Fin Y (m):</label>
-                <input
-                  type="number"
-                  step={0.01}
-                  value={wall.end.y}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value) || 0;
-                    onUpdateWall({ ...wall, end: { ...wall.end, y: val } });
-                  }}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-100 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Wall Thickness */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
-              Espesor de Muro (Metros):
-            </label>
-            <select
-              value={wall.thickness}
-              onChange={(e) =>
-                onUpdateWall({ ...wall, thickness: parseFloat(e.target.value) })
-              }
-              className="w-full bg-slate-800 text-xs font-semibold text-slate-200 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500"
-            >
-              <option value={0.10}>0.10 m (10 cm - Tabique liviano)</option>
-              <option value={0.15}>0.15 m (15 cm - Muro interior estándar)</option>
-              <option value={0.20}>0.20 m (20 cm - Muro exterior perimetral)</option>
-              <option value={0.30}>0.30 m (30 cm - Muro estructural doble)</option>
-            </select>
-          </div>
-
-          {/* Wall Type */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
-              Tipo estructural:
-            </label>
-            <select
-              value={wall.type}
-              onChange={(e) =>
-                onUpdateWall({ ...wall, type: e.target.value as Wall['type'] })
-              }
-              className="w-full bg-slate-800 text-xs font-semibold text-slate-200 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500"
-            >
-              <option value="exterior">Exterior Perimetral</option>
-              <option value="interior">Interior Carga / División</option>
-              <option value="partition">Tabiquería</option>
-            </select>
-          </div>
-
-          {/* Openings (doors & windows on this wall) */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-slate-300">
-                Puertas & Ventanas en este muro:
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-1.5 mb-3">
-              <button
-                onClick={() => onAddOpeningToWall(wall.id, 'door')}
-                className="px-2 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/30 text-xs font-semibold"
-              >
-                + Añadir Puerta (0.8m)
-              </button>
-              <button
-                onClick={() => onAddOpeningToWall(wall.id, 'window')}
-                className="px-2 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/30 text-xs font-semibold"
-              >
-                + Añadir Ventana (1.2m)
-              </button>
-            </div>
-
-            {wallOpenings.length === 0 ? (
-              <div className="text-[11px] text-slate-500 italic">
-                Sin puertas o ventanas insertadas
-              </div>
-            ) : (
-              <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                {wallOpenings.map((op) => (
-                  <div
-                    key={op.id}
-                    className="flex items-center justify-between p-2 rounded-lg bg-slate-800/70 border border-slate-700 text-xs"
-                  >
-                    <div>
-                      <span className="font-semibold text-slate-200">
-                        {op.type === 'door' ? 'Puerta' : 'Ventana'}
-                      </span>
-                      <span className="text-slate-400 ml-1">
-                        ({op.width.toFixed(2)} m de ancho)
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => onDeleteOpening(op.id)}
-                      className="text-red-400 hover:text-red-300"
-                      title="Eliminar apertura"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <button
-          onClick={onDeleteSelected}
-          className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-md mt-4"
-        >
-          <Trash2 className="w-4 h-4" />
-          <span>Eliminar Muro</span>
-        </button>
-      </aside>
+      <WallInspectorComponent
+        wall={wall}
+        project={project}
+        onUpdateWall={onUpdateWall}
+        onDeleteSelected={onDeleteSelected}
+        onAddOpeningToWall={onAddOpeningToWall}
+        onDeleteOpening={onDeleteOpening}
+      />
     );
   }
 

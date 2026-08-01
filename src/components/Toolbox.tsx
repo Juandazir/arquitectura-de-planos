@@ -39,6 +39,14 @@ interface ToolboxProps {
   onSelectPlumbingType: (type: PlumbingFixtureType) => void;
   selectedElectricalType: ElectricalItemType;
   onSelectElectricalType: (type: ElectricalItemType) => void;
+  activeWallThickness?: number;
+  onSelectWallThickness?: (thick: number) => void;
+  activeDoorWidth?: number;
+  onSelectDoorWidth?: (width: number) => void;
+  activeWindowWidth?: number;
+  onSelectWindowWidth?: (width: number) => void;
+  onQuickAddRoomTag?: (tagName: string) => void;
+  onQuickInsertPrefabRoom?: (roomType: 'bedroom' | 'bathroom' | 'kitchen' | 'living' | 'office' | 'studio') => void;
 }
 
 export const Toolbox: React.FC<ToolboxProps> = ({
@@ -51,8 +59,17 @@ export const Toolbox: React.FC<ToolboxProps> = ({
   onSelectPlumbingType,
   selectedElectricalType,
   onSelectElectricalType,
+  activeWallThickness = 0.15,
+  onSelectWallThickness,
+  activeDoorWidth = 0.85,
+  onSelectDoorWidth,
+  activeWindowWidth = 1.40,
+  onSelectWindowWidth,
+  onQuickAddRoomTag,
+  onQuickInsertPrefabRoom,
 }) => {
   const [furnitureCategory, setFurnitureCategory] = useState<string>('all');
+  const [archTab, setArchTab] = useState<'tools' | 'prefabs' | 'structural' | 'tags'>('tools');
 
   const filteredFurniture = FURNITURE_CATALOG.filter(
     (item) => furnitureCategory === 'all' || item.category === furnitureCategory
@@ -153,99 +170,338 @@ export const Toolbox: React.FC<ToolboxProps> = ({
         {/* ARCHITECTURE LAYER */}
         {(activeLayer === 'arch' || activeLayer === 'all') && (
           <div className="mb-5">
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-indigo-400 mb-2 flex items-center justify-between">
-              <span>1. Arquitectura 2D (m)</span>
-              <span className="text-[10px] font-mono text-slate-500">Atajos</span>
-            </h3>
-            <div className="space-y-1.5">
-              <button
-                onClick={() => onSelectTool('wall')}
-                className={`w-full p-2.5 rounded-xl flex items-center justify-between gap-3 transition-all ${
-                  activeTool === 'wall'
-                    ? 'bg-indigo-600 text-white shadow-md font-bold'
-                    : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center">
-                    <Square className="w-4 h-4" />
-                  </div>
-                  <div className="text-left">
-                    <div className="text-xs font-semibold">Muro Arquitectónico</div>
-                    <div className="text-[10px] text-slate-400">
-                      Clic inicio y fin (Espesor 15/20cm)
-                    </div>
-                  </div>
-                </div>
-                <kbd className="px-1.5 py-0.5 rounded bg-slate-950/80 border border-slate-700 text-indigo-300 font-mono text-[10px] font-bold">W</kbd>
-              </button>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-indigo-400">
+                1. Arquitectura 2D (m)
+              </h3>
+            </div>
 
+            {/* Sub-navigation tabs for Architecture */}
+            <div className="grid grid-cols-4 gap-1 p-1 mb-3 rounded-lg bg-slate-900 border border-slate-800 text-[10px] font-semibold">
               <button
-                onClick={() => onSelectTool('door')}
-                className={`w-full p-2.5 rounded-xl flex items-center justify-between gap-3 transition-all ${
-                  activeTool === 'door'
-                    ? 'bg-indigo-600 text-white shadow-md font-bold'
-                    : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800'
+                onClick={() => setArchTab('tools')}
+                className={`py-1.5 rounded text-center transition-all ${
+                  archTab === 'tools'
+                    ? 'bg-indigo-600 text-white font-bold shadow'
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center">
-                    <DoorOpen className="w-4 h-4" />
-                  </div>
-                  <div className="text-left">
-                    <div className="text-xs font-semibold">Puerta de Acceso</div>
-                    <div className="text-[10px] text-slate-400">
-                      0.80 - 0.90m con ángulo de apertura
-                    </div>
-                  </div>
-                </div>
-                <kbd className="px-1.5 py-0.5 rounded bg-slate-950/80 border border-slate-700 text-indigo-300 font-mono text-[10px] font-bold">D</kbd>
+                Muros/Vanos
               </button>
-
               <button
-                onClick={() => onSelectTool('window')}
-                className={`w-full p-2.5 rounded-xl flex items-center justify-between gap-3 transition-all ${
-                  activeTool === 'window'
-                    ? 'bg-indigo-600 text-white shadow-md font-bold'
-                    : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800'
+                onClick={() => setArchTab('prefabs')}
+                className={`py-1.5 rounded text-center transition-all ${
+                  archTab === 'prefabs'
+                    ? 'bg-indigo-600 text-white font-bold shadow'
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center">
-                    <AppWindow className="w-4 h-4" />
-                  </div>
-                  <div className="text-left">
-                    <div className="text-xs font-semibold">Ventana / Ventanal</div>
-                    <div className="text-[10px] text-slate-400">
-                      Iluminación y ventilación en muro
-                    </div>
-                  </div>
-                </div>
-                <kbd className="px-1.5 py-0.5 rounded bg-slate-950/80 border border-slate-700 text-indigo-300 font-mono text-[10px] font-bold">N</kbd>
+                Diseños
               </button>
-
               <button
-                onClick={() => onSelectTool('room_label')}
-                className={`w-full p-2.5 rounded-xl flex items-center justify-between gap-3 transition-all ${
-                  activeTool === 'room_label'
-                    ? 'bg-indigo-600 text-white shadow-md font-bold'
-                    : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800'
+                onClick={() => setArchTab('structural')}
+                className={`py-1.5 rounded text-center transition-all ${
+                  archTab === 'structural'
+                    ? 'bg-indigo-600 text-white font-bold shadow'
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center">
-                    <Tag className="w-4 h-4" />
-                  </div>
-                  <div className="text-left">
-                    <div className="text-xs font-semibold">Etiqueta de Habitación</div>
-                    <div className="text-[10px] text-slate-400">
-                      Asignar nombre y m² al espacio
-                    </div>
-                  </div>
-                </div>
-                <kbd className="px-1.5 py-0.5 rounded bg-slate-950/80 border border-slate-700 text-indigo-300 font-mono text-[10px] font-bold">L</kbd>
+                Estructuras
+              </button>
+              <button
+                onClick={() => setArchTab('tags')}
+                className={`py-1.5 rounded text-center transition-all ${
+                  archTab === 'tags'
+                    ? 'bg-indigo-600 text-white font-bold shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Etiquetas
               </button>
             </div>
+
+            {/* TAB 1: DRAWING TOOLS & DIMENSION PRESETS */}
+            {archTab === 'tools' && (
+              <div className="space-y-3">
+                {/* Wall drawing with active thickness selector */}
+                <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800">
+                  <button
+                    onClick={() => onSelectTool('wall')}
+                    className={`w-full p-2 rounded-lg flex items-center justify-between gap-2 mb-2.5 transition-all ${
+                      activeTool === 'wall'
+                        ? 'bg-indigo-600 text-white shadow-md font-bold'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Square className="w-4 h-4 text-indigo-300" />
+                      <div className="text-left text-xs">
+                        <div>Muro Arquitectónico</div>
+                        <div className="text-[10px] opacity-80">Clic inicio y fin en lienzo</div>
+                      </div>
+                    </div>
+                    <kbd className="px-1.5 py-0.5 rounded bg-slate-950 border border-slate-700 text-indigo-300 font-mono text-[10px]">W</kbd>
+                  </button>
+
+                  <div className="text-[10px] font-semibold text-slate-400 mb-1.5">Grosor de Muro Activo:</div>
+                  <div className="grid grid-cols-4 gap-1 text-[10px]">
+                    {[
+                      { thick: 0.10, label: '10cm', desc: 'Tabique' },
+                      { thick: 0.15, label: '15cm', desc: 'Interior' },
+                      { thick: 0.20, label: '20cm', desc: 'Exterior' },
+                      { thick: 0.30, label: '30cm', desc: 'Carga' },
+                    ].map((item) => (
+                      <button
+                        key={item.thick}
+                        onClick={() => onSelectWallThickness?.(item.thick)}
+                        className={`p-1.5 rounded border text-center transition-all ${
+                          activeWallThickness === item.thick
+                            ? 'bg-indigo-500/30 border-indigo-500 text-indigo-200 font-bold'
+                            : 'bg-slate-800/50 border-slate-700/60 text-slate-400 hover:bg-slate-800'
+                        }`}
+                      >
+                        <div>{item.label}</div>
+                        <div className="text-[9px] text-slate-500">{item.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Doors with width presets */}
+                <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800">
+                  <button
+                    onClick={() => onSelectTool('door')}
+                    className={`w-full p-2 rounded-lg flex items-center justify-between gap-2 mb-2 transition-all ${
+                      activeTool === 'door'
+                        ? 'bg-indigo-600 text-white shadow-md font-bold'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <DoorOpen className="w-4 h-4 text-amber-300" />
+                      <div className="text-left text-xs">
+                        <div>Puerta de Acceso</div>
+                        <div className="text-[10px] opacity-80">Clic sobre cualquier muro</div>
+                      </div>
+                    </div>
+                    <kbd className="px-1.5 py-0.5 rounded bg-slate-950 border border-slate-700 text-indigo-300 font-mono text-[10px]">D</kbd>
+                  </button>
+
+                  <div className="text-[10px] font-semibold text-slate-400 mb-1.5">Ancho de Puerta:</div>
+                  <div className="grid grid-cols-4 gap-1 text-[10px]">
+                    {[
+                      { width: 0.70, label: '0.70m', desc: 'Baño' },
+                      { width: 0.85, label: '0.85m', desc: 'Estándar' },
+                      { width: 1.20, label: '1.20m', desc: 'Ancha' },
+                      { width: 1.60, label: '1.60m', desc: 'Doble' },
+                    ].map((item) => (
+                      <button
+                        key={item.width}
+                        onClick={() => onSelectDoorWidth?.(item.width)}
+                        className={`p-1.5 rounded border text-center transition-all ${
+                          activeDoorWidth === item.width
+                            ? 'bg-amber-500/30 border-amber-500 text-amber-200 font-bold'
+                            : 'bg-slate-800/50 border-slate-700/60 text-slate-400 hover:bg-slate-800'
+                        }`}
+                      >
+                        <div>{item.label}</div>
+                        <div className="text-[9px] text-slate-500">{item.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Windows with width presets */}
+                <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800">
+                  <button
+                    onClick={() => onSelectTool('window')}
+                    className={`w-full p-2 rounded-lg flex items-center justify-between gap-2 mb-2 transition-all ${
+                      activeTool === 'window'
+                        ? 'bg-indigo-600 text-white shadow-md font-bold'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <AppWindow className="w-4 h-4 text-cyan-300" />
+                      <div className="text-left text-xs">
+                        <div>Ventana / Ventanal</div>
+                        <div className="text-[10px] opacity-80">Clic sobre cualquier muro</div>
+                      </div>
+                    </div>
+                    <kbd className="px-1.5 py-0.5 rounded bg-slate-950 border border-slate-700 text-indigo-300 font-mono text-[10px]">N</kbd>
+                  </button>
+
+                  <div className="text-[10px] font-semibold text-slate-400 mb-1.5">Ancho de Ventana:</div>
+                  <div className="grid grid-cols-4 gap-1 text-[10px]">
+                    {[
+                      { width: 0.60, label: '0.60m', desc: 'Ventiluz' },
+                      { width: 1.20, label: '1.20m', desc: 'Estándar' },
+                      { width: 1.80, label: '1.80m', desc: 'Amplia' },
+                      { width: 2.40, label: '2.40m', desc: 'Balcón' },
+                    ].map((item) => (
+                      <button
+                        key={item.width}
+                        onClick={() => onSelectWindowWidth?.(item.width)}
+                        className={`p-1.5 rounded border text-center transition-all ${
+                          activeWindowWidth === item.width
+                            ? 'bg-cyan-500/30 border-cyan-500 text-cyan-200 font-bold'
+                            : 'bg-slate-800/50 border-slate-700/60 text-slate-400 hover:bg-slate-800'
+                        }`}
+                      >
+                        <div>{item.label}</div>
+                        <div className="text-[9px] text-slate-500">{item.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Arch / Passage opening */}
+                <button
+                  onClick={() => onSelectTool('arch_opening')}
+                  className={`w-full p-2.5 rounded-xl flex items-center justify-between gap-3 transition-all ${
+                    activeTool === 'arch_opening'
+                      ? 'bg-indigo-600 text-white shadow-md font-bold'
+                      : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center text-purple-300 text-xs font-bold">
+                      ∩
+                    </div>
+                    <div className="text-left">
+                      <div className="text-xs font-semibold">Arco de Paso / Vano Libre</div>
+                      <div className="text-[10px] text-slate-400">Paso abierto sin puerta (1.20m)</div>
+                    </div>
+                  </div>
+                  <kbd className="px-1.5 py-0.5 rounded bg-slate-950 border border-slate-700 text-indigo-300 font-mono text-[10px]">A</kbd>
+                </button>
+              </div>
+            )}
+
+            {/* TAB 2: PREFAB ROOM GENERATOR (1-CLICK AMBIENTES) */}
+            {archTab === 'prefabs' && (
+              <div className="space-y-2">
+                <div className="text-[11px] text-slate-400 mb-1 font-medium">
+                  Genera una habitación completa con muros, puerta, ventana y etiqueta en 1 clic:
+                </div>
+
+                {[
+                  { id: 'bedroom', name: 'Dormitorio Principal', dim: '4.0m x 3.0m (12 m²)', icon: '🛏️', desc: '4 muros 15cm + Puerta 0.90m + Ventana 1.40m' },
+                  { id: 'bathroom', name: 'Baño Completo', dim: '2.5m x 1.8m (4.5 m²)', icon: '🚿', desc: '4 muros 15cm + Puerta 0.80m + Ventiluz 0.60m' },
+                  { id: 'kitchen', name: 'Cocina / Comedor', dim: '4.0m x 3.5m (14 m²)', icon: '🍳', desc: '4 muros 15cm + Puerta 0.90m + Ventana 1.40m' },
+                  { id: 'living', name: 'Sala de Estar', dim: '5.0m x 4.0m (20 m²)', icon: '🛋️', desc: '4 muros 20cm + Puerta 0.90m + Ventanal 2.40m' },
+                  { id: 'office', name: 'Oficina / Estudio', dim: '3.5m x 3.0m (10.5 m²)', icon: '💻', desc: '4 muros 15cm + Puerta 0.85m + Ventana 1.20m' },
+                  { id: 'studio', name: 'Monoambiente Studio', dim: '6.0m x 4.5m (27 m²)', icon: '🏢', desc: 'Perímetro completo 20cm para departamento' },
+                ].map((prefab) => (
+                  <button
+                    key={prefab.id}
+                    onClick={() => onQuickInsertPrefabRoom?.(prefab.id as any)}
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-indigo-500/60 hover:bg-slate-800/80 transition-all text-left flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="text-xl">{prefab.icon}</div>
+                      <div>
+                        <div className="text-xs font-semibold text-slate-200 group-hover:text-indigo-300">
+                          {prefab.name}
+                        </div>
+                        <div className="text-[10px] text-indigo-400 font-mono font-bold">{prefab.dim}</div>
+                        <div className="text-[9px] text-slate-500">{prefab.desc}</div>
+                      </div>
+                    </div>
+                    <Plus className="w-4 h-4 text-slate-500 group-hover:text-indigo-400 transition-colors" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* TAB 3: STRUCTURAL ELEMENTS (COLUMNS, STAIRS, FIREPLACES) */}
+            {archTab === 'structural' && (
+              <div className="space-y-2">
+                <div className="text-[11px] text-slate-400 mb-1 font-medium">
+                  Inserta pilares, columnas de hormigón y escaleras en el plano:
+                </div>
+
+                <div className="grid grid-cols-1 gap-2">
+                  {FURNITURE_CATALOG.filter(item => item.category === 'structural').map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        onSelectFurnitureId(item.id);
+                        onSelectTool('furniture_item');
+                      }}
+                      className={`w-full p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
+                        selectedFurnitureId === item.id && activeTool === 'furniture_item'
+                          ? 'bg-indigo-600/30 border-indigo-500 text-white'
+                          : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-indigo-300">
+                          🏛️
+                        </div>
+                        <div>
+                          <div className="text-xs font-semibold">{item.name}</div>
+                          <div className="text-[10px] text-slate-400">{item.description}</div>
+                        </div>
+                      </div>
+                      <Plus className="w-4 h-4 text-indigo-400" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 4: QUICK ROOM TAGS */}
+            {archTab === 'tags' && (
+              <div className="space-y-3">
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <button
+                    onClick={() => onSelectTool('room_label')}
+                    className={`w-full p-2 rounded-lg flex items-center justify-between gap-2 mb-2 transition-all ${
+                      activeTool === 'room_label'
+                        ? 'bg-indigo-600 text-white font-bold'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Tag className="w-4 h-4 text-indigo-300" />
+                      <div className="text-xs font-semibold">Etiqueta Personalizada</div>
+                    </div>
+                    <kbd className="px-1.5 py-0.5 rounded bg-slate-950 border border-slate-700 text-indigo-300 font-mono text-[10px]">L</kbd>
+                  </button>
+
+                  <div className="text-[10px] font-semibold text-slate-400 mb-2">
+                    Insertar nombre rápido de habitación (1 clic):
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                    {[
+                      'Dormitorio Principal',
+                      'Dormitorio 2',
+                      'Sala de Estar',
+                      'Comedor',
+                      'Cocina Abierta',
+                      'Baño Principal',
+                      'Baño Social',
+                      'Garaje / Cochera',
+                      'Terraza Balcón',
+                      'Lavadero',
+                      'Oficina / Estudio',
+                      'Hall / Recibidor',
+                    ].map((tagName) => (
+                      <button
+                        key={tagName}
+                        onClick={() => onQuickAddRoomTag?.(tagName)}
+                        className="p-2 rounded-lg bg-slate-800/70 border border-slate-700/60 hover:bg-indigo-600/30 hover:border-indigo-500 text-slate-200 text-left transition-all font-medium truncate flex items-center gap-1.5"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                        <span className="truncate">{tagName}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
