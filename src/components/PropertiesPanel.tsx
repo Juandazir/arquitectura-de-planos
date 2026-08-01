@@ -194,16 +194,66 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             </button>
           </div>
 
-          <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 space-y-2">
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-400">Longitud lineal:</span>
-              <span className="font-bold text-indigo-300">{formatMeters(lenMeters)}</span>
+          <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 space-y-2.5">
+            <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-700/50">
+              <span className="text-slate-400 font-semibold">Longitud del muro:</span>
+              <span className="font-bold text-indigo-300 text-sm">{formatMeters(lenMeters)}</span>
             </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-400">Punto Inicio:</span>
-              <span className="text-slate-300">
-                X: {wall.start.x.toFixed(1)}m, Y: {wall.start.y.toFixed(1)}m
-              </span>
+
+            <div className="text-[11px] font-bold text-slate-300">Coordenadas Exactas (m):</div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] text-slate-400">Inicio X (m):</label>
+                <input
+                  type="number"
+                  step={0.01}
+                  value={wall.start.x}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    onUpdateWall({ ...wall, start: { ...wall.start, x: val } });
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-100 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-slate-400">Inicio Y (m):</label>
+                <input
+                  type="number"
+                  step={0.01}
+                  value={wall.start.y}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    onUpdateWall({ ...wall, start: { ...wall.start, y: val } });
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-100 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-slate-400">Fin X (m):</label>
+                <input
+                  type="number"
+                  step={0.01}
+                  value={wall.end.x}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    onUpdateWall({ ...wall, end: { ...wall.end, x: val } });
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-100 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-slate-400">Fin Y (m):</label>
+                <input
+                  type="number"
+                  step={0.01}
+                  value={wall.end.y}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    onUpdateWall({ ...wall, end: { ...wall.end, y: val } });
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-100 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
             </div>
           </div>
 
@@ -348,19 +398,64 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
 
           <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 space-y-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-slate-400">Ancho (X):</span>
-              <span className="font-bold text-purple-300">{item.width.toFixed(2)} m</span>
+            <div className="font-bold text-purple-300 pb-1 border-b border-slate-700/50">
+              Dimensiones y Ubicación Exacta (m):
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Fondo / Profundidad (Y):</span>
-              <span className="font-bold text-purple-300">{item.depth.toFixed(2)} m</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Posición centro:</span>
-              <span className="text-slate-300">
-                {item.position.x.toFixed(1)}m, {item.position.y.toFixed(1)}m
-              </span>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] text-slate-400">Ancho X (m):</label>
+                <input
+                  type="number"
+                  step={0.01}
+                  min={0.1}
+                  value={item.width}
+                  onChange={(e) => {
+                    const val = Math.max(0.1, parseFloat(e.target.value) || 0.1);
+                    onUpdateFurniture({ ...item, width: val });
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-100 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-slate-400">Fondo Y (m):</label>
+                <input
+                  type="number"
+                  step={0.01}
+                  min={0.1}
+                  value={item.depth}
+                  onChange={(e) => {
+                    const val = Math.max(0.1, parseFloat(e.target.value) || 0.1);
+                    onUpdateFurniture({ ...item, depth: val });
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-100 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-slate-400">Centro X (m):</label>
+                <input
+                  type="number"
+                  step={0.01}
+                  value={item.position.x}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    onUpdateFurniture({ ...item, position: { ...item.position, x: val } });
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-100 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-slate-400">Centro Y (m):</label>
+                <input
+                  type="number"
+                  step={0.01}
+                  value={item.position.y}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    onUpdateFurniture({ ...item, position: { ...item.position, y: val } });
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-slate-100 focus:outline-none focus:border-purple-500"
+                />
+              </div>
             </div>
           </div>
 

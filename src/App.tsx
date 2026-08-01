@@ -535,6 +535,16 @@ export default function App() {
         onToggleGrid={() => {
           setProject((prev) => ({ ...prev, showGrid: !prev.showGrid }));
         }}
+        onToggleSnap={() => {
+          setProject((prev) => ({ ...prev, snapToGrid: !prev.snapToGrid }));
+        }}
+        onChangeGridSize={(size) => {
+          setProject((prev) => ({
+            ...prev,
+            gridSizeMeters: size,
+            snapToGrid: size > 0.01 ? true : false,
+          }));
+        }}
         onToggleDimensions={() => {
           setProject((prev) => ({ ...prev, showDimensions: !prev.showDimensions }));
         }}

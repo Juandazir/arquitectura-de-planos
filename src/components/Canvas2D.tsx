@@ -25,7 +25,7 @@ import {
   getOpeningPosition 
 } from '../utils/geometry';
 import { FURNITURE_CATALOG } from '../data/catalog';
-import { ZoomIn, ZoomOut, Maximize, Compass, Ruler } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, Compass, Ruler, Magnet } from 'lucide-react';
 
 interface Canvas2DProps {
   project: CADProject;
@@ -233,7 +233,18 @@ export const Canvas2D: React.FC<Canvas2DProps> = ({
     const screenX = e.clientX - rect.left;
     const screenY = e.clientY - rect.top;
     const rawWorld = screenToWorld(screenX, screenY);
-    const worldPt = snapToGridPoint(rawWorld, project.gridSizeMeters, project.snapToGrid);
+    const snapEnabled = project.snapToGrid && !e.altKey;
+    let worldPt = snapToGridPoint(rawWorld, project.gridSizeMeters, snapEnabled);
+
+    if (e.shiftKey && drawStartPt && (activeTool === 'wall' || activeTool === 'pipe_cold' || activeTool === 'pipe_hot' || activeTool === 'pipe_drain')) {
+      const dx = Math.abs(worldPt.x - drawStartPt.x);
+      const dy = Math.abs(worldPt.y - drawStartPt.y);
+      if (dx > dy) {
+        worldPt = { x: worldPt.x, y: drawStartPt.y };
+      } else {
+        worldPt = { x: drawStartPt.x, y: worldPt.y };
+      }
+    }
 
     // Pan with middle mouse button or when 'pan' tool is active
     if (e.button === 1 || activeTool === 'pan') {
@@ -562,13 +573,25 @@ export const Canvas2D: React.FC<Canvas2DProps> = ({
     }
 
     const rawWorld = screenToWorld(screenX, screenY);
-    const worldPt = snapToGridPoint(rawWorld, project.gridSizeMeters, project.snapToGrid);
+    const snapEnabled = project.snapToGrid && !e.altKey;
+    let worldPt = snapToGridPoint(rawWorld, project.gridSizeMeters, snapEnabled);
+
+    if (e.shiftKey && drawStartPt && (activeTool === 'wall' || activeTool === 'pipe_cold' || activeTool === 'pipe_hot' || activeTool === 'pipe_drain')) {
+      const dx = Math.abs(worldPt.x - drawStartPt.x);
+      const dy = Math.abs(worldPt.y - drawStartPt.y);
+      if (dx > dy) {
+        worldPt = { x: worldPt.x, y: drawStartPt.y };
+      } else {
+        worldPt = { x: drawStartPt.x, y: worldPt.y };
+      }
+    }
+
     setCurrentMousePt(worldPt);
 
     // Dragging selected object
     if (isDraggingObj && selectedId && selectedType) {
       const newPos = { x: worldPt.x - dragOffset.x, y: worldPt.y - dragOffset.y };
-      const snappedPos = snapToGridPoint(newPos, project.gridSizeMeters, project.snapToGrid);
+      const snappedPos = snapToGridPoint(newPos, project.gridSizeMeters, snapEnabled);
 
       if (selectedType === 'furniture') {
         const f = project.furniture.find((item) => item.id === selectedId);
@@ -666,55 +689,170 @@ export const Canvas2D: React.FC<Canvas2DProps> = ({
       canvas.height = height;
     }
 
-    // 1. Clear Canvas (Clean dark engineering blueprint or light modern canvas theme - let's use a very sleek dark architectural theme #0B1120)
-    ctx.fillStyle = '#0B1120';
+    // 1. Clear Canvas (Sleek dark engineering CAD blueprint theme #070B14 with subtle gradient background)
+    const bgGradient = ctx.createLinearGradient(0, 0, width, height);
+    bgGradient.addColorStop(0, '#090D18');
+    bgGradient.addColorStop(1, '#050810');
+    ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, width, height);
 
-    // 2. Draw Metric Grid (0.50m and 1.00m)
+    // 2. High-Precision Professional CAD Metric Grid
     if (project.showGrid) {
       const minWorld = screenToWorld(0, 0);
       const maxWorld = screenToWorld(width, height);
 
-      const gridStep = project.gridSizeMeters || 0.5;
-      const startX = Math.floor(minWorld.x / gridStep) * gridStep;
-      const endX = Math.ceil(maxWorld.x / gridStep) * gridStep;
-      const startY = Math.floor(minWorld.y / gridStep) * gridStep;
-      const endY = Math.ceil(maxWorld.y / gridStep) * gridStep;
+      const baseStep = project.gridSizeMeters || 0.05; // Base snap grid (e.g., 5cm)
+      const pxPerBaseStep = baseStep * scale;
 
-      ctx.lineWidth = 1;
-      for (let x = startX; x <= endX; x += gridStep) {
-        const isMajor = Math.abs(x % 1.0) < 0.01;
-        ctx.strokeStyle = isMajor ? '#1E293B' : '#0F172A';
-        const p1 = worldToScreen(x, minWorld.y);
-        const p2 = worldToScreen(x, maxWorld.y);
+      // Adaptive level of detail: if sub-grid step is too small in pixels, scale it up so grid remains ultra-crisp
+      let renderStep = baseStep;
+      if (pxPerBaseStep < 8) {
+        if (baseStep * 2 * scale >= 8) renderStep = baseStep * 2;
+        else if (baseStep * 5 * scale >= 8) renderStep = baseStep * 5;
+        else if (baseStep * 10 * scale >= 8) renderStep = baseStep * 10;
+        else renderStep = 1.0; // 1m default if zoomed far out
+      }
+
+      const startX = Math.floor(minWorld.x / renderStep) * renderStep;
+      const endX = Math.ceil(maxWorld.x / renderStep) * renderStep;
+      const startY = Math.floor(minWorld.y / renderStep) * renderStep;
+      const endY = Math.ceil(maxWorld.y / renderStep) * renderStep;
+
+      // Draw Grid Lines (Verticals X)
+      for (let x = startX; x <= endX; x += renderStep) {
+        const roundedX = Math.round(x * 100) / 100;
+        const isAxis = Math.abs(roundedX) < 0.001;
+        const isSuperMajor = Math.abs(roundedX % 5.0) < 0.001;
+        const isMajor1m = Math.abs(roundedX % 1.0) < 0.001;
+        const isHalfM = Math.abs(roundedX % 0.5) < 0.001;
+
+        const p1 = worldToScreen(roundedX, minWorld.y);
+        const p2 = worldToScreen(roundedX, maxWorld.y);
+
         ctx.beginPath();
         ctx.moveTo(p1.x, p1.y);
         ctx.lineTo(p2.x, p2.y);
+
+        if (isAxis) {
+          // Y-Axis line (X = 0) in Emerald Green
+          ctx.strokeStyle = '#10B981';
+          ctx.lineWidth = 2;
+        } else if (isSuperMajor) {
+          // 5 Meter Major Line
+          ctx.strokeStyle = 'rgba(129, 140, 248, 0.45)';
+          ctx.lineWidth = 1.5;
+        } else if (isMajor1m) {
+          // 1 Meter Line
+          ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+          ctx.lineWidth = 1;
+        } else if (isHalfM) {
+          // 0.5m Line
+          ctx.strokeStyle = 'rgba(51, 65, 85, 0.35)';
+          ctx.lineWidth = 0.8;
+        } else {
+          // Fine Sub-Grid Line
+          ctx.strokeStyle = 'rgba(30, 41, 59, 0.25)';
+          ctx.lineWidth = 0.5;
+        }
         ctx.stroke();
 
-        // Major coordinate numbers (meters)
-        if (isMajor && scale > 30) {
-          ctx.fillStyle = '#475569';
-          ctx.font = '10px sans-serif';
-          ctx.fillText(`${x.toFixed(0)}m`, p1.x + 3, 14);
+        // 1m and 5m Metric Labels
+        if (isMajor1m && !isAxis && scale > 25) {
+          ctx.fillStyle = isSuperMajor ? '#A5B4FC' : '#64748B';
+          ctx.font = isSuperMajor ? 'bold 10px monospace' : '9px monospace';
+          ctx.fillText(`${roundedX.toFixed(0)}m`, p1.x + 4, 34);
         }
       }
 
-      for (let y = startY; y <= endY; y += gridStep) {
-        const isMajor = Math.abs(y % 1.0) < 0.01;
-        ctx.strokeStyle = isMajor ? '#1E293B' : '#0F172A';
-        const p1 = worldToScreen(minWorld.x, y);
-        const p2 = worldToScreen(maxWorld.x, y);
+      // Draw Grid Lines (Horizontals Y)
+      for (let y = startY; y <= endY; y += renderStep) {
+        const roundedY = Math.round(y * 100) / 100;
+        const isAxis = Math.abs(roundedY) < 0.001;
+        const isSuperMajor = Math.abs(roundedY % 5.0) < 0.001;
+        const isMajor1m = Math.abs(roundedY % 1.0) < 0.001;
+        const isHalfM = Math.abs(roundedY % 0.5) < 0.001;
+
+        const p1 = worldToScreen(minWorld.x, roundedY);
+        const p2 = worldToScreen(maxWorld.x, roundedY);
+
         ctx.beginPath();
         ctx.moveTo(p1.x, p1.y);
         ctx.lineTo(p2.x, p2.y);
+
+        if (isAxis) {
+          // X-Axis line (Y = 0) in Rose Red
+          ctx.strokeStyle = '#F43F5E';
+          ctx.lineWidth = 2;
+        } else if (isSuperMajor) {
+          ctx.strokeStyle = 'rgba(129, 140, 248, 0.45)';
+          ctx.lineWidth = 1.5;
+        } else if (isMajor1m) {
+          ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+          ctx.lineWidth = 1;
+        } else if (isHalfM) {
+          ctx.strokeStyle = 'rgba(51, 65, 85, 0.35)';
+          ctx.lineWidth = 0.8;
+        } else {
+          ctx.strokeStyle = 'rgba(30, 41, 59, 0.25)';
+          ctx.lineWidth = 0.5;
+        }
         ctx.stroke();
 
-        if (isMajor && scale > 30) {
-          ctx.fillStyle = '#475569';
-          ctx.font = '10px sans-serif';
-          ctx.fillText(`${y.toFixed(0)}m`, 4, p1.y - 3);
+        if (isMajor1m && !isAxis && scale > 25) {
+          ctx.fillStyle = isSuperMajor ? '#A5B4FC' : '#64748B';
+          ctx.font = isSuperMajor ? 'bold 10px monospace' : '9px monospace';
+          ctx.fillText(`${roundedY.toFixed(0)}m`, 28, p1.y - 3);
         }
+      }
+
+      // Draw Major Intersection Crosshairs (+) for authentic CAD blueprint feel
+      if (scale > 35) {
+        const tickStep = 1.0; // Every 1 meter
+        const tickStartX = Math.floor(minWorld.x / tickStep) * tickStep;
+        const tickEndX = Math.ceil(maxWorld.x / tickStep) * tickStep;
+        const tickStartY = Math.floor(minWorld.y / tickStep) * tickStep;
+        const tickEndY = Math.ceil(maxWorld.y / tickStep) * tickStep;
+
+        ctx.strokeStyle = 'rgba(129, 140, 248, 0.45)';
+        ctx.lineWidth = 1;
+        for (let tx = tickStartX; tx <= tickEndX; tx += tickStep) {
+          for (let ty = tickStartY; ty <= tickEndY; ty += tickStep) {
+            const sp = worldToScreen(tx, ty);
+            ctx.beginPath();
+            ctx.moveTo(sp.x - 3, sp.y);
+            ctx.lineTo(sp.x + 3, sp.y);
+            ctx.moveTo(sp.x, sp.y - 3);
+            ctx.lineTo(sp.x, sp.y + 3);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // Draw Origin Target Badge at (0.00, 0.00)
+      const originPt = worldToScreen(0, 0);
+      if (originPt.x >= -50 && originPt.x <= width + 50 && originPt.y >= -50 && originPt.y <= height + 50) {
+        ctx.beginPath();
+        ctx.arc(originPt.x, originPt.y, 6, 0, Math.PI * 2);
+        ctx.strokeStyle = '#6366F1';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(originPt.x, originPt.y, 2, 0, Math.PI * 2);
+        ctx.fillStyle = '#A5B4FC';
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.strokeStyle = '#6366F1';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(originPt.x + 8, originPt.y + 8, 72, 18, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#818CF8';
+        ctx.font = 'bold 9px monospace';
+        ctx.fillText('Origen (0,0)', originPt.x + 12, originPt.y + 20);
       }
     }
 
@@ -1104,17 +1242,42 @@ export const Canvas2D: React.FC<Canvas2DProps> = ({
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Preview length tooltip in meters
+      // Preview length and angle tooltip in meters & degrees
       const len = distance(activeStartPt, currentMousePt);
+      const angleRad = Math.atan2(currentMousePt.y - activeStartPt.y, currentMousePt.x - activeStartPt.x);
+      let angleDeg = Math.round((angleRad * 180) / Math.PI);
+      if (angleDeg < 0) angleDeg += 360;
+
+      const labelText = `${formatMeters(len)} • ${angleDeg}°`;
       const midX = (p1.x + p2.x) / 2;
       const midY = (p1.y + p2.y) / 2;
-      ctx.fillStyle = '#1E293B';
-      ctx.fillRect(midX - 35, midY - 20, 70, 18);
+
+      ctx.save();
+      ctx.font = 'bold 11px monospace';
+      const tw = ctx.measureText(labelText).width;
+      const boxW = tw + 16;
+      const boxH = 22;
+
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+      ctx.strokeStyle =
+        activeTool === 'wall'
+          ? '#818CF8'
+          : activeTool === 'pipe_cold'
+          ? '#60A5FA'
+          : activeTool === 'pipe_hot'
+          ? '#F87171'
+          : '#38BDF8';
+      ctx.lineWidth = 1;
+
+      ctx.beginPath();
+      ctx.roundRect(midX - boxW / 2, midY - 26, boxW, boxH, 5);
+      ctx.fill();
+      ctx.stroke();
+
       ctx.fillStyle = '#38BDF8';
-      ctx.font = 'bold 11px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(formatMeters(len), midX, midY - 6);
-      ctx.textAlign = 'left';
+      ctx.fillText(labelText, midX, midY - 11);
+      ctx.restore();
     }
 
     // Preview furniture or plumbing item under cursor when placement tool is selected
@@ -1132,6 +1295,117 @@ export const Canvas2D: React.FC<Canvas2DProps> = ({
         ctx.strokeRect(-wPx / 2, -dPx / 2, wPx, dPx);
         ctx.fillRect(-wPx / 2, -dPx / 2, wPx, dPx);
         ctx.restore();
+      }
+    }
+
+    // 8. CAD VIEWPORT RULERS (Top & Left Edge Metric HUD)
+    if (project.showGrid) {
+      const rulerSize = 22; // Height of top ruler & width of left ruler
+      const minW = screenToWorld(0, 0);
+      const maxW = screenToWorld(width, height);
+
+      // Top Ruler Bar
+      ctx.fillStyle = '#060A12';
+      ctx.fillRect(0, 0, width, rulerSize);
+      ctx.strokeStyle = '#1E293B';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, rulerSize);
+      ctx.lineTo(width, rulerSize);
+      ctx.stroke();
+
+      // Left Ruler Bar
+      ctx.fillRect(0, 0, rulerSize, height);
+      ctx.beginPath();
+      ctx.moveTo(rulerSize, 0);
+      ctx.lineTo(rulerSize, height);
+      ctx.stroke();
+
+      // Top-Left Corner Box
+      ctx.fillStyle = '#0F172A';
+      ctx.fillRect(0, 0, rulerSize, rulerSize);
+      ctx.strokeStyle = '#334155';
+      ctx.strokeRect(0, 0, rulerSize, rulerSize);
+
+      ctx.fillStyle = '#818CF8';
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('m', rulerSize / 2, 14);
+      ctx.textAlign = 'left';
+
+      // Top Ruler Tick Marks & Metric Numbers (X)
+      const rStep = scale > 120 ? 0.25 : scale > 50 ? 0.50 : 1.0;
+      const rStartX = Math.floor(minW.x / rStep) * rStep;
+      const rEndX = Math.ceil(maxW.x / rStep) * rStep;
+
+      for (let rx = rStartX; rx <= rEndX; rx += rStep) {
+        const rxRound = Math.round(rx * 100) / 100;
+        const sp = worldToScreen(rxRound, 0);
+        if (sp.x >= rulerSize && sp.x <= width) {
+          const is1m = Math.abs(rxRound % 1.0) < 0.001;
+          const tickH = is1m ? 10 : 5;
+
+          ctx.strokeStyle = is1m ? '#818CF8' : '#475569';
+          ctx.beginPath();
+          ctx.moveTo(sp.x, rulerSize - tickH);
+          ctx.lineTo(sp.x, rulerSize);
+          ctx.stroke();
+
+          if (is1m && scale > 20) {
+            ctx.fillStyle = '#94A3B8';
+            ctx.font = '9px monospace';
+            ctx.fillText(`${rxRound.toFixed(0)}m`, sp.x + 2, 12);
+          }
+        }
+      }
+
+      // Left Ruler Tick Marks & Metric Numbers (Y)
+      const rStartY = Math.floor(minW.y / rStep) * rStep;
+      const rEndY = Math.ceil(maxW.y / rStep) * rStep;
+
+      for (let ry = rStartY; ry <= rEndY; ry += rStep) {
+        const ryRound = Math.round(ry * 100) / 100;
+        const sp = worldToScreen(0, ryRound);
+        if (sp.y >= rulerSize && sp.y <= height) {
+          const is1m = Math.abs(ryRound % 1.0) < 0.001;
+          const tickW = is1m ? 10 : 5;
+
+          ctx.strokeStyle = is1m ? '#818CF8' : '#475569';
+          ctx.beginPath();
+          ctx.moveTo(rulerSize - tickW, sp.y);
+          ctx.lineTo(rulerSize, sp.y);
+          ctx.stroke();
+
+          if (is1m && scale > 20) {
+            ctx.save();
+            ctx.translate(11, sp.y - 2);
+            ctx.fillStyle = '#94A3B8';
+            ctx.font = '9px monospace';
+            ctx.fillText(`${ryRound.toFixed(0)}m`, 0, 0);
+            ctx.restore();
+          }
+        }
+      }
+
+      // Active Cursor Position Projection Indicators on Rulers
+      const mouseScr = worldToScreen(currentMousePt.x, currentMousePt.y);
+      if (mouseScr.x >= rulerSize) {
+        ctx.fillStyle = '#10B981'; // X axis position indicator
+        ctx.beginPath();
+        ctx.moveTo(mouseScr.x - 3, 0);
+        ctx.lineTo(mouseScr.x + 3, 0);
+        ctx.lineTo(mouseScr.x, rulerSize);
+        ctx.closePath();
+        ctx.fill();
+      }
+      if (mouseScr.y >= rulerSize) {
+        ctx.fillStyle = '#F43F5E'; // Y axis position indicator
+        ctx.beginPath();
+        ctx.moveTo(0, mouseScr.y - 3);
+        ctx.lineTo(0, mouseScr.y + 3);
+        ctx.lineTo(rulerSize, mouseScr.y);
+        ctx.closePath();
+        ctx.fill();
       }
     }
   }, [
@@ -1211,6 +1485,14 @@ export const Canvas2D: React.FC<Canvas2DProps> = ({
         <div>
           X: <strong className="text-white">{currentMousePt.x.toFixed(2)}m</strong> | Y:{' '}
           <strong className="text-white">{currentMousePt.y.toFixed(2)}m</strong>
+        </div>
+        <div className="border-l border-slate-700 pl-2 text-emerald-400 font-bold flex items-center gap-1">
+          <Magnet className="w-3 h-3" />
+          <span>
+            {project.snapToGrid
+              ? `Precisión: ${Math.round((project.gridSizeMeters || 0.05) * 100)} cm`
+              : 'Precisión: Libre (1 cm)'}
+          </span>
         </div>
         {activeTool !== 'select' && (
           <div className="text-amber-400 font-bold border-l border-slate-700 pl-2">

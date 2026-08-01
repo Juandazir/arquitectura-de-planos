@@ -443,6 +443,7 @@ export const Toolbox: React.FC<ToolboxProps> = ({
                 { id: 'kitchen', label: 'Cocina' },
                 { id: 'office', label: 'Estudio' },
                 { id: 'bathroom', label: 'Baño/Lav.' },
+                { id: 'outdoor', label: 'Jardín/Ext.' },
               ].map((cat) => (
                 <button
                   key={cat.id}

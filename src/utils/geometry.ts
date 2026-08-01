@@ -16,10 +16,16 @@ export function formatAreaM2(sqMeters: number): string {
 }
 
 export function snapToGridPoint(pt: Point2D, gridSize: number, enabled: boolean): Point2D {
-  if (!enabled || gridSize <= 0) return pt;
+  if (!enabled || gridSize <= 0) {
+    return {
+      x: Math.round(pt.x * 100) / 100,
+      y: Math.round(pt.y * 100) / 100,
+    };
+  }
+  const step = gridSize;
   return {
-    x: Math.round(pt.x / gridSize) * gridSize,
-    y: Math.round(pt.y / gridSize) * gridSize,
+    x: Math.round(Math.round(pt.x / step) * step * 100) / 100,
+    y: Math.round(Math.round(pt.y / step) * step * 100) / 100,
   };
 }
 

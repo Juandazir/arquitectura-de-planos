@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { 
   Ruler, 
   Download, 
@@ -13,7 +13,12 @@ import {
   Eye,
   EyeOff,
   Keyboard,
-  Building2
+  Building2,
+  Magnet,
+  ChevronDown,
+  Plus,
+  SlidersHorizontal,
+  Image as ImageIcon
 } from 'lucide-react';
 import { CADProject, CADLayer } from '../types/cad';
 import { SAMPLE_TEMPLATES } from '../data/catalog';
@@ -39,13 +44,14 @@ interface NavbarProps {
   onOpenShortcutsModal?: () => void;
   onExportPng: () => void;
   onToggleGrid: () => void;
+  onToggleSnap?: () => void;
+  onChangeGridSize?: (size: number) => void;
   onToggleDimensions: () => void;
   onToggleMeasureLine: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   project,
-  activeLayer,
   visibleLayers,
   onToggleArchitecture,
   onLoadProject,
@@ -59,10 +65,25 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenShortcutsModal,
   onExportPng,
   onToggleGrid,
+  onToggleSnap,
+  onChangeGridSize,
   onToggleDimensions,
   onToggleMeasureLine,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navRef = useRef<HTMLDivElement>(null);
+  const [activeMenu, setActiveMenu] = useState<'file' | 'view' | 'help' | null>(null);
+
+  // Close menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) {
+        setActiveMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleTemplateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const key = e.target.value;
@@ -102,55 +123,16 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="h-14 bg-slate-900 text-slate-100 border-b border-slate-800 px-4 flex items-center justify-between select-none shadow-md z-30">
-      {/* Left branding */}
+    <header ref={navRef} className="h-14 bg-slate-900 text-slate-100 border-b border-slate-800 px-3 md:px-5 flex items-center justify-between select-none shadow-md z-30 relative">
+      {/* Undo/Redo */}
       <div className="flex items-center space-x-3">
-        <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-600 text-white font-bold shadow-sm">
-          <Ruler className="w-5 h-5" />
-        </div>
-        <div>
-          <h1 className="font-bold text-sm leading-tight tracking-tight text-white">
-            Arch2D Studio
-          </h1>
-          <p className="text-[11px] text-slate-400 font-medium">
-            Planos 2D • Tubería • Electricidad • Metros (m)
-          </p>
-        </div>
-      </div>
-
-      {/* Center project selector & templates */}
-      <div className="hidden md:flex items-center space-x-3 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60">
-        <FolderOpen className="w-4 h-4 text-slate-400" />
-        <span className="text-xs text-slate-400 font-medium">Plantillas:</span>
-        <select
-          onChange={handleTemplateChange}
-          defaultValue=""
-          className="bg-slate-900 text-xs font-semibold text-slate-200 border border-slate-700 rounded px-2.5 py-1 focus:outline-none focus:border-indigo-500 cursor-pointer"
-        >
-          <option value="" disabled>
-            -- Seleccionar Ejemplo o Blank --
-          </option>
-          <option value="modern_apartment">Depto 2 Ambientes (54 m² - Completo)</option>
-          <option value="blank_project">Plano 100% en Blanco (Sin Nada - 0 m²)</option>
-        </select>
-        <button
-          onClick={() => onLoadProject(JSON.parse(JSON.stringify(SAMPLE_TEMPLATES.blank_project)))}
-          title="Crear un lienzo 100% en blanco para diseñar desde cero"
-          className="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-xs font-semibold text-slate-100 rounded border border-slate-600 transition-colors whitespace-nowrap"
-        >
-          + Plano en Blanco
-        </button>
-      </div>
-
-      {/* Right control buttons */}
-      <div className="flex items-center space-x-2">
-        {/* Undo / Redo */}
-        <div className="flex items-center bg-slate-800 rounded-lg p-1 border border-slate-700/80 shadow-sm">
+        {/* Quick Undo / Redo */}
+        <div className="flex items-center bg-slate-800/90 rounded-lg p-1 border border-slate-700/80 shadow-sm">
           <button
             onClick={onUndo}
             disabled={!canUndo}
             title="Deshacer (Ctrl+Z)"
-            className={`p-2 rounded-md transition-all ${
+            className={`p-1.5 rounded-md transition-all ${
               canUndo
                 ? 'text-slate-200 hover:bg-slate-700 active:scale-95'
                 : 'text-slate-600 cursor-not-allowed'
@@ -162,7 +144,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={onRedo}
             disabled={!canRedo}
             title="Rehacer (Ctrl+Y)"
-            className={`p-2 rounded-md transition-all ${
+            className={`p-1.5 rounded-md transition-all ${
               canRedo
                 ? 'text-slate-200 hover:bg-slate-700 active:scale-95'
                 : 'text-slate-600 cursor-not-allowed'
@@ -171,110 +153,264 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Redo2 className="w-4 h-4" />
           </button>
         </div>
+      </div>
 
-        {/* View toggles */}
-        <div className="flex items-center bg-slate-800 rounded-lg p-1 border border-slate-700/80 shadow-sm">
-          {onToggleArchitecture && (
-            <button
-              onClick={onToggleArchitecture}
-              title={
-                visibleLayers?.arch
-                  ? "Ocultar Capa de Arquitectura / Paredes"
-                  : "Mostrar Capa de Arquitectura / Paredes"
-              }
-              className={`px-3 py-2 rounded-md text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all active:scale-95 ${
-                visibleLayers?.arch
-                  ? 'bg-blue-600 text-white shadow ring-2 ring-blue-400/50'
-                  : 'bg-slate-700/60 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
-              }`}
-            >
-              <Building2 className={`w-4 h-4 ${visibleLayers?.arch ? 'text-blue-200' : 'text-slate-400'}`} />
-              <span className="hidden sm:inline">Capa Arquitectura</span>
-              {visibleLayers?.arch ? (
-                <Eye className="w-3.5 h-3.5 text-blue-200 ml-0.5" />
-              ) : (
-                <EyeOff className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
-              )}
-            </button>
+      {/* Center/Right Dropdowns & Actions */}
+      <div className="flex items-center space-x-2 md:space-x-2.5">
+        
+        {/* 1. PROYECTO & PLANTILLAS DROPDOWN */}
+        <div className="relative">
+          <button
+            onClick={() => setActiveMenu(activeMenu === 'file' ? null : 'file')}
+            className={`px-3 py-1.5 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-1.5 border transition-all ${
+              activeMenu === 'file'
+                ? 'bg-indigo-600 text-white border-indigo-500 shadow-md ring-2 ring-indigo-400/30'
+                : 'bg-slate-800 text-slate-200 border-slate-700/80 hover:bg-slate-750 hover:text-white'
+            }`}
+          >
+            <FolderOpen className="w-4 h-4 text-indigo-400" />
+            <span className="hidden sm:inline">Proyecto & Archivo</span>
+            <span className="sm:hidden">Proyecto</span>
+            <ChevronDown className="w-3.5 h-3.5 opacity-70" />
+          </button>
+
+          {activeMenu === 'file' && (
+            <div className="absolute left-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 py-2 text-xs text-slate-200 divide-y divide-slate-700/60 animate-in fade-in duration-150">
+              {/* Plantillas */}
+              <div className="px-3 py-2 space-y-2">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Cargar Plantillas
+                </div>
+                <select
+                  onChange={(e) => {
+                    handleTemplateChange(e);
+                    setActiveMenu(null);
+                  }}
+                  defaultValue=""
+                  className="w-full bg-slate-900 text-xs font-medium text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                >
+                  <option value="" disabled>-- Seleccionar Plantilla --</option>
+                  <option value="modern_apartment">Depto 2 Ambientes (54 m²)</option>
+                  <option value="blank_project">Plano 100% en Blanco (0 m²)</option>
+                </select>
+
+                <button
+                  onClick={() => {
+                    onLoadProject(JSON.parse(JSON.stringify(SAMPLE_TEMPLATES.blank_project)));
+                    setActiveMenu(null);
+                  }}
+                  className="w-full px-2.5 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 font-semibold rounded-lg border border-indigo-500/30 flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Nuevo Plano en Blanco</span>
+                </button>
+              </div>
+
+              {/* Import / Export */}
+              <div className="px-1.5 py-1.5 space-y-0.5">
+                <button
+                  onClick={() => {
+                    handleExportJson();
+                    setActiveMenu(null);
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-700/80 rounded-lg flex items-center gap-2.5 font-medium transition-colors"
+                >
+                  <Download className="w-4 h-4 text-emerald-400" />
+                  <div>
+                    <div className="font-semibold text-slate-100">Guardar Proyecto (.json)</div>
+                    <div className="text-[10px] text-slate-400">Descargar archivo para reabrir después</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    fileInputRef.current?.click();
+                    setActiveMenu(null);
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-700/80 rounded-lg flex items-center gap-2.5 font-medium transition-colors"
+                >
+                  <Upload className="w-4 h-4 text-blue-400" />
+                  <div>
+                    <div className="font-semibold text-slate-100">Abrir Proyecto (.json)</div>
+                    <div className="text-[10px] text-slate-400">Cargar un archivo previo guardado</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    onExportPng();
+                    setActiveMenu(null);
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-700/80 rounded-lg flex items-center gap-2.5 font-medium transition-colors"
+                >
+                  <ImageIcon className="w-4 h-4 text-amber-400" />
+                  <div>
+                    <div className="font-semibold text-slate-100">Exportar Imagen (.png)</div>
+                    <div className="text-[10px] text-slate-400">Captura visual de alta definición</div>
+                  </div>
+                </button>
+              </div>
+            </div>
           )}
-          <button
-            onClick={onToggleGrid}
-            title="Alternar Cuadrícula de Metros (Tecla: G)"
-            className={`px-3 py-2 rounded-md text-xs md:text-sm font-semibold flex items-center gap-1.5 transition-all ${
-              project.showGrid
-                ? 'bg-indigo-600 text-white shadow'
-                : 'text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <Grid className="w-4 h-4" />
-            <span className="hidden sm:inline">Rejilla 0.5m</span>
-          </button>
-          <button
-            onClick={onToggleMeasureLine}
-            title="Activar o desactivar línea de metro dinámica / cota continua (Tecla: T)"
-            className={`px-3 py-2 rounded-md text-xs md:text-sm font-semibold flex items-center gap-1.5 transition-all ${
-              project.showMeasureLine
-                ? 'bg-amber-600 text-white shadow font-bold'
-                : 'text-slate-400 hover:bg-slate-700 hover:text-slate-200'
-            }`}
-          >
-            <Ruler className="w-4 h-4" />
-            <span className="hidden sm:inline">Línea Metro</span>
-          </button>
-          <button
-            onClick={onToggleDimensions}
-            title="Alternar Cotas / Medidas Internacionales (Tecla: U)"
-            className={`px-3 py-2 rounded-md text-xs md:text-sm font-semibold flex items-center gap-1.5 transition-all ${
-              project.showDimensions
-                ? 'bg-indigo-600 text-white shadow'
-                : 'text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <Eye className="w-4 h-4" />
-            <span className="hidden sm:inline">Medidas</span>
-          </button>
         </div>
 
-        {/* Keyboard Shortcuts Button (NEW for architects speed) */}
-        {onOpenShortcutsModal && (
+        {/* 2. VISTA & PRECISIÓN DROPDOWN */}
+        <div className="relative">
           <button
-            onClick={onOpenShortcutsModal}
-            className="px-3.5 py-2 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 font-semibold text-xs md:text-sm flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
-            title="Atajos de Teclado para Velocidad de Diseño (Tecla: ? o K)"
+            onClick={() => setActiveMenu(activeMenu === 'view' ? null : 'view')}
+            className={`px-3 py-1.5 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-1.5 border transition-all ${
+              activeMenu === 'view'
+                ? 'bg-indigo-600 text-white border-indigo-500 shadow-md ring-2 ring-indigo-400/30'
+                : 'bg-slate-800 text-slate-200 border-slate-700/80 hover:bg-slate-750 hover:text-white'
+            }`}
           >
-            <Keyboard className="w-4 h-4 text-indigo-400" />
-            <span className="hidden lg:inline">Atajos</span>
-            <kbd className="hidden xl:inline-block px-1.5 py-0.5 rounded bg-slate-900/80 text-[10px] font-mono font-bold text-indigo-300 border border-indigo-500/30">
-              K
-            </kbd>
+            <SlidersHorizontal className="w-4 h-4 text-indigo-400" />
+            <span className="hidden md:inline">Vista & Precisión</span>
+            <span className="md:hidden">Vista</span>
+            <span className="bg-slate-900 text-emerald-400 text-[10px] font-mono px-1.5 py-0.5 rounded border border-slate-700 flex items-center gap-1 font-bold">
+              <Magnet className="w-3 h-3" />
+              {project.snapToGrid ? `${Math.round((project.gridSizeMeters || 0.05) * 100)}cm` : 'Libre'}
+            </span>
+            <ChevronDown className="w-3.5 h-3.5 opacity-70" />
           </button>
-        )}
 
-        {/* Step Guide Button */}
-        <button
-          onClick={onOpenStepGuide}
-          className="px-3.5 py-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 font-semibold text-xs md:text-sm flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
-          title="Guía interactiva paso a paso"
-        >
-          <HelpCircle className="w-4 h-4 text-indigo-400" />
-          <span className="hidden lg:inline">Paso a Paso</span>
-        </button>
+          {activeMenu === 'view' && (
+            <div className="absolute right-0 sm:left-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 py-2 text-xs text-slate-200 divide-y divide-slate-700/60 animate-in fade-in duration-150">
+              
+              {/* Capas y Capa Arquitectura */}
+              <div className="px-3 py-2 space-y-1.5">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Visibilidad de Capas y Cotas
+                </div>
 
-        {/* Audit & Takeoff */}
+                {onToggleArchitecture && (
+                  <button
+                    onClick={onToggleArchitecture}
+                    className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-900/60 hover:bg-slate-700 text-slate-200 font-medium transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-blue-400" />
+                      <span>Capa Arquitectura / Paredes</span>
+                    </div>
+                    {visibleLayers?.arch ? (
+                      <Eye className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <EyeOff className="w-4 h-4 text-slate-500" />
+                    )}
+                  </button>
+                )}
+
+                <button
+                  onClick={onToggleDimensions}
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-900/60 hover:bg-slate-700 text-slate-200 font-medium transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Eye className="w-4 h-4 text-indigo-400" />
+                    <span>Cotas & Medidas (U)</span>
+                  </div>
+                  {project.showDimensions ? (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">VISIBLES</span>
+                  ) : (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">OCULTAS</span>
+                  )}
+                </button>
+
+                <button
+                  onClick={onToggleMeasureLine}
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-900/60 hover:bg-slate-700 text-slate-200 font-medium transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Ruler className="w-4 h-4 text-amber-400" />
+                    <span>Regla Dinámica de Metro (T)</span>
+                  </div>
+                  {project.showMeasureLine ? (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">ACTIVA</span>
+                  ) : (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">OFF</span>
+                  )}
+                </button>
+
+                <button
+                  onClick={onToggleGrid}
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-900/60 hover:bg-slate-700 text-slate-200 font-medium transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Grid className="w-4 h-4 text-indigo-400" />
+                    <span>Rejilla de Metros (G)</span>
+                  </div>
+                  {project.showGrid ? (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">VISIBLE</span>
+                  ) : (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">OCULTA</span>
+                  )}
+                </button>
+              </div>
+
+              {/* Ajustes de Imán y Rejilla */}
+              <div className="px-3 py-2 space-y-2">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Ajuste por Imán y Exactitud
+                </div>
+
+                {onToggleSnap && (
+                  <button
+                    onClick={onToggleSnap}
+                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg font-bold transition-all ${
+                      project.snapToGrid
+                        ? 'bg-emerald-600/20 border border-emerald-500/40 text-emerald-300'
+                        : 'bg-slate-900 border border-slate-700 text-slate-400'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Magnet className="w-4 h-4" />
+                      <span>Imán de Ajuste Automático</span>
+                    </div>
+                    <span>{project.snapToGrid ? 'ON' : 'LIBRE'}</span>
+                  </button>
+                )}
+
+                {onChangeGridSize && (
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1 font-semibold">
+                      Paso de Rejilla / Exactitud:
+                    </label>
+                    <select
+                      value={project.gridSizeMeters || 0.05}
+                      onChange={(e) => {
+                        onChangeGridSize(parseFloat(e.target.value));
+                      }}
+                      className="w-full bg-slate-900 text-xs font-bold text-slate-100 border border-slate-700 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                    >
+                      <option value={0.01}>⚡ Libre / 1 cm (Ultra Fino)</option>
+                      <option value={0.05}>🎯 5 cm (Precisión Recomendada)</option>
+                      <option value={0.10}>📏 10 cm (Estándar)</option>
+                      <option value={0.25}>📐 25 cm (Paso Medio)</option>
+                      <option value={0.50}>🧱 50 cm (Estructura Muros)</option>
+                      <option value={1.00}>🗺️ 1.0 m (Grid de 1 Metro)</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+            </div>
+          )}
+        </div>
+
+        {/* 3. AUDITORÍA & COMPUTO METRICO (Póliza/Presupuesto) */}
         <button
           onClick={onOpenAuditModal}
-          className="px-3.5 py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-semibold text-xs md:text-sm flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
-          title="Cómputo Métrico de Materiales y Auditoría Técnica"
+          className="px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-semibold text-xs md:text-sm flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+          title="Cómputo Métrico de Materiales y Presupuesto"
         >
           <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-          <span className="hidden md:inline">Presupuesto & Auditoría</span>
+          <span className="hidden lg:inline">Presupuesto</span>
         </button>
 
-        {/* Optional AI Assistant */}
+        {/* 4. ASISTENTE IA (Opcional) */}
         {onOpenAIModal && (
           <button
             onClick={onOpenAIModal}
-            className="px-3.5 py-2 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 font-semibold text-xs md:text-sm flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+            className="px-3 py-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 font-semibold text-xs md:text-sm flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
             title="Asistente IA Arquitectónico"
           >
             <Sparkles className="w-4 h-4 text-purple-400" />
@@ -282,43 +418,67 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         )}
 
-        {/* Export image / project */}
-        <div className="flex items-center space-x-1.5">
+        {/* 5. AYUDA & ATAJOS DROPDOWN */}
+        <div className="relative">
           <button
-            onClick={onExportPng}
-            className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs md:text-sm font-semibold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
-            title="Exportar plano en imagen PNG"
+            onClick={() => setActiveMenu(activeMenu === 'help' ? null : 'help')}
+            className={`px-2.5 py-1.5 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-1.5 border transition-all ${
+              activeMenu === 'help'
+                ? 'bg-indigo-600 text-white border-indigo-500 shadow-md ring-2 ring-indigo-400/30'
+                : 'bg-slate-800 text-slate-200 border-slate-700/80 hover:bg-slate-750 hover:text-white'
+            }`}
           >
-            <Download className="w-4 h-4" />
-            <span className="hidden sm:inline">PNG</span>
+            <HelpCircle className="w-4 h-4 text-indigo-400" />
+            <span className="hidden lg:inline">Ayuda</span>
+            <ChevronDown className="w-3.5 h-3.5 opacity-70" />
           </button>
 
-          <button
-            onClick={handleExportJson}
-            className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs md:text-sm font-semibold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
-            title="Guardar archivo .JSON del proyecto"
-          >
-            <Download className="w-4 h-4" />
-            <span className="hidden xl:inline">JSON</span>
-          </button>
+          {activeMenu === 'help' && (
+            <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 py-1.5 text-xs text-slate-200 divide-y divide-slate-700/60 animate-in fade-in duration-150">
+              <div className="px-1 py-1 space-y-0.5">
+                <button
+                  onClick={() => {
+                    onOpenStepGuide();
+                    setActiveMenu(null);
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-700/80 rounded-lg flex items-center gap-2.5 font-semibold text-slate-200 transition-colors"
+                >
+                  <HelpCircle className="w-4 h-4 text-indigo-400" />
+                  <span>Guía Paso a Paso</span>
+                </button>
 
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs md:text-sm font-semibold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
-            title="Cargar archivo .JSON guardado"
-          >
-            <Upload className="w-4 h-4" />
-            <span className="hidden xl:inline">Abrir</span>
-          </button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleImportJson}
-            accept=".json"
-            className="hidden"
-          />
+                {onOpenShortcutsModal && (
+                  <button
+                    onClick={() => {
+                      onOpenShortcutsModal();
+                      setActiveMenu(null);
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-slate-700/80 rounded-lg flex items-center justify-between font-semibold text-slate-200 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Keyboard className="w-4 h-4 text-indigo-400" />
+                      <span>Atajos de Teclado</span>
+                    </div>
+                    <kbd className="px-1.5 py-0.5 rounded bg-slate-900 text-[10px] font-mono text-indigo-300 border border-slate-700 font-bold">
+                      K
+                    </kbd>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
+
       </div>
+
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleImportJson}
+        accept=".json"
+        className="hidden"
+      />
     </header>
   );
 };
+

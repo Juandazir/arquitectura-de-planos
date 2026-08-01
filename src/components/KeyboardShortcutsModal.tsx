@@ -24,6 +24,8 @@ export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
       title: 'Navegación y Edición General',
       color: 'text-indigo-400',
       items: [
+        { keys: ['Shift'], label: 'Muros Rectos 90° (Ortogonal)', description: 'Mantiene pulsado para trazar muros perfectamente rectos en 0°, 90°, 180° o 270°', icon: <Square className="w-4 h-4 text-emerald-400" /> },
+        { keys: ['Alt'], label: 'Colocación Libre Milimétrica', description: 'Mantiene pulsado para ignorar el imán y colocar objetos o muros con precisión libre (1 cm)', icon: <Ruler className="w-4 h-4 text-amber-400" /> },
         { keys: ['V', '1'], label: 'Herramienta Elegir / Seleccionar', description: 'Seleccionar, mover o inspeccionar elementos en el plano', icon: <MousePointer className="w-4 h-4 text-indigo-400" /> },
         { keys: ['H', 'Espacio'], label: 'Desplazar Lienzo (Pan)', description: 'Arrastrar el plano con el ratón sin modificar elementos', icon: <Hand className="w-4 h-4 text-indigo-400" /> },
         { keys: ['M'], label: 'Regla de Medición Libre', description: 'Medir distancias en metros de punto A a punto B', icon: <Ruler className="w-4 h-4 text-indigo-400" /> },

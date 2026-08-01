@@ -114,7 +114,7 @@ export interface ElectricalWire {
 
 export interface FurnitureItem {
   id: string;
-  category: 'bedroom' | 'living' | 'dining' | 'kitchen' | 'office' | 'storage' | 'bathroom';
+  category: 'bedroom' | 'living' | 'dining' | 'kitchen' | 'office' | 'storage' | 'bathroom' | 'outdoor';
   name: string;      // Display name in Spanish
   position: Point2D; // Center position in meters
   width: number;     // Width in meters (X axis before rotation)
@@ -164,7 +164,7 @@ export interface CADProject {
 
 export interface CatalogFurnitureTemplate {
   id: string;
-  category: 'bedroom' | 'living' | 'dining' | 'kitchen' | 'office' | 'storage' | 'bathroom';
+  category: 'bedroom' | 'living' | 'dining' | 'kitchen' | 'office' | 'storage' | 'bathroom' | 'outdoor';
   name: string;
   width: number; // meters
   depth: number; // meters
