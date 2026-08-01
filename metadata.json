@@ -1,0 +1,6 @@
+{
+  "name": "Arch2D Studio - Planos, Tubería y Electricidad",
+  "description": "Herramienta CAD 2D profesional en metros con capas paso a paso para muros arquitectónicos, redes de fontanería, electricidad y catálogo de muebles con medidas realistas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
